@@ -41,6 +41,9 @@ class Enemy(pygame.sprite.Sprite):
         self.spawn_x = x
         self.spawn_y = y
         self.current_platform = None
+        # Hopping behavior
+        self.hop_cooldown = 0
+        self.hop_pattern = pattern in ['patrol', 'sine']  # Some enemies hop
 
     def apply_gravity(self):
         self.vy += GRAVITY
@@ -85,6 +88,11 @@ class Enemy(pygame.sprite.Sprite):
                 elif self.rect.right >= right:
                     self.rect.right = right
                     self.vx = -abs(self.vx)
+            
+            # Hopping behavior for patrol enemies
+            if self.hop_pattern and self.hop_cooldown <= 0:
+                self.vy = -10  # Jump
+                self.hop_cooldown = 60  # Cooldown between hops
         elif self.pattern == 'chase':
             if player.rect.centerx < self.rect.centerx:
                 self.rect.x -= self.speed
@@ -94,6 +102,15 @@ class Enemy(pygame.sprite.Sprite):
             self.sine_offset += 0.05
             self.rect.y += int(math.sin(self.sine_offset) * 2)
             self.rect.x += self.vx
+            
+            # Hopping behavior for sine enemies
+            if self.hop_pattern and self.hop_cooldown <= 0:
+                self.vy = -8
+                self.hop_cooldown = 50
+
+        # Update hop cooldown
+        if self.hop_cooldown > 0:
+            self.hop_cooldown -= 1
 
         # simple gravity and platform collision
         self.apply_gravity()

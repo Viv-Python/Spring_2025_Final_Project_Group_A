@@ -3,7 +3,7 @@ from settings import BLUE, PLAYER_WIDTH, PLAYER_HEIGHT, GRAVITY, WIDTH, HEIGHT
 
 class Attack(pygame.sprite.Sprite):
     """Represents the player's attack hitbox"""
-    def __init__(self, x, y, width=50, height=40, direction=1, damage=15):
+    def __init__(self, x, y, width=70, height=50, direction=1, damage=15):
         super().__init__()
         self.image = pygame.Surface((width, height))
         self.image.fill((100, 200, 255))
@@ -21,7 +21,9 @@ class Attack(pygame.sprite.Sprite):
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((PLAYER_WIDTH, PLAYER_HEIGHT))
+        self.width = PLAYER_WIDTH
+        self.height = PLAYER_HEIGHT
+        self.image = pygame.Surface((self.width, self.height))
         self.image.fill(BLUE)
         self.rect = self.image.get_rect(topleft=(x, y))
         self.vel_x = 0
@@ -62,8 +64,8 @@ class Player(pygame.sprite.Sprite):
     def attack(self):
         """Create an attack hitbox"""
         if self.attack_cooldown <= 0:
-            attack_width = 40
-            attack_height = 40
+            attack_width = 70  # Increased reach
+            attack_height = 50
             if self.facing_right:
                 attack_x = self.rect.right
             else:
@@ -100,20 +102,28 @@ class Player(pygame.sprite.Sprite):
             if self.fall_through_timer == 0:
                 self.falling_through = False
 
+        # Apply horizontal movement
         self.rect.x += self.vel_x
+        
+        # Apply vertical movement and check collision
         self.rect.y += self.vel_y
         self.on_ground = False
+        
         for platform in platforms:
             if self.rect.colliderect(platform.rect):
-                if self.vel_y > 0:  # Falling
-                    # Check if we're falling through (down key pressed)
-                    if self.falling_through:
-                        continue  # Skip collision, fall through
-                    
-                    self.rect.bottom = platform.rect.top
-                    self.vel_y = 0
-                    self.on_ground = True
-                    self.falling_through = False
+                # Only collide from above when falling or standing normally
+                if self.vel_y >= 0:  # Only check when moving down or stationary
+                    # Check if we were above the platform before moving
+                    old_y = self.rect.y - self.vel_y
+                    if old_y + self.height <= platform.rect.top:
+                        # We came from above, so land on platform
+                        if self.falling_through:
+                            # If actively falling through, skip this platform
+                            continue
+                        self.rect.bottom = platform.rect.top
+                        self.vel_y = 0
+                        self.on_ground = True
+                        self.falling_through = False
 
         # Enforce strict horizontal bounds
         if self.rect.left < 0:

@@ -13,6 +13,7 @@ from boss import Boss
 from obstacles import spike, fire, slow_trap, slippery, block, falling_rock, spike_row, poison_pool, electric, healing_plant, bouncy
 from door import Door
 from treasure import Treasure
+from health_pickup import HealthPickup
 from utils import generate_terrain, generate_obstacles
 
 
@@ -45,14 +46,17 @@ class Game:
 
     def init_level(self):
         """Initialize a new level with procedurally generated terrain and obstacles"""
-        self.player = Player(WIDTH // 2, HEIGHT - 100)
+        # Player starts higher up to be on a natural ground platform (not at bottom)
+        self.player = Player(WIDTH // 2, HEIGHT - 120)
         self.platforms = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
         self.projectiles = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
         self.treasures = pygame.sprite.Group()
+        self.health_pickups = pygame.sprite.Group()
         self.doors = pygame.sprite.Group()
         self.boss = None
+        self.enemies_defeated = False
         
         is_boss = (self.level == BOSS_LEVEL)
         
@@ -73,24 +77,48 @@ class Game:
             for obstacle in obstacles_list:
                 self.obstacles.add(obstacle)
         
-        # Add door to level
-        door_x = WIDTH // 2 - 20
-        door_y = 60
-        door = Door(door_x, door_y)
-        self.doors.add(door)
+        # Add health pickups (1-3 per level, placed in challenging but accessible spots)
+        self._spawn_health_pickups(difficulty)
         
-        # Add treasures scattered throughout the level
-        num_treasures = 3 + difficulty
-        for i in range(num_treasures):
-            treasure_x = random.randint(50, WIDTH - 50)
-            treasure_y = random.randint(100, HEIGHT - 150)
-            treasure = Treasure(treasure_x, treasure_y, sticker_id=i)
-            self.treasures.add(treasure)
+        # Door spawn: at top of level on the highest platform
+        self._spawn_door()
+        
+        # Treasure spawn: only one per level, spawns after enemies defeated (starts hidden)
+        self._spawn_treasure()
         
         self.all_sprites = pygame.sprite.Group(self.player, *self.platforms, *self.enemies, 
-                                               *self.obstacles, *self.treasures, *self.doors)
+                                               *self.obstacles, *self.treasures, *self.health_pickups, *self.doors)
         if self.boss:
             self.all_sprites.add(self.boss)
+    
+    def _spawn_health_pickups(self, difficulty):
+        """Spawn 1-3 health pickups at challenging but accessible locations"""
+        num_pickups = random.randint(1, 3)
+        for _ in range(num_pickups):
+            # Place pickups at various heights and x positions
+            x = random.randint(100, WIDTH - 100)
+            y = random.randint(150, HEIGHT - 200)
+            heal_amount = random.randint(10, 30)
+            pickup = HealthPickup(x, y, heal_amount=heal_amount)
+            self.health_pickups.add(pickup)
+    
+    def _spawn_door(self):
+        """Spawn door at the top of the level on unobstructed terrain"""
+        # Place door on the topmost platform
+        door_width = 50
+        door_height = 80
+        door_x = WIDTH // 2 - door_width // 2
+        door_y = 30  # High up, just below the top
+        door = Door(door_x, door_y, width=door_width, height=door_height)
+        self.doors.add(door)
+    
+    def _spawn_treasure(self):
+        """Spawn one treasure at the middle of the level, hidden until enemies defeated"""
+        treasure_x = WIDTH // 2
+        treasure_y = HEIGHT // 2
+        treasure = Treasure(treasure_x, treasure_y, sticker_id=self.level - 1)
+        treasure.hide()  # Hide until enemies are defeated
+        self.treasures.add(treasure)
 
     def init_regular_level(self, difficulty):
         """Initialize a regular level with multiple enemies"""
@@ -194,11 +222,28 @@ class Game:
                     self.player.rect.bottom = obstacle.rect.top
                     self.player.vel_y = 0
         
+        # Health pickup collection
+        pickup_hits = pygame.sprite.spritecollide(self.player, self.health_pickups, False)
+        for pickup in pickup_hits:
+            self.player.heal(pickup.heal_amount)
+            pickup.collect()
+        
         # Treasure collection
         treasure_hits = pygame.sprite.spritecollide(self.player, self.treasures, False)
         for treasure in treasure_hits:
-            self.collected_stickers.add(treasure.sticker_id)
-            treasure.collect()
+            if not treasure.hidden:  # Only collectible if not hidden
+                self.collected_stickers.add(treasure.sticker_id)
+                treasure.collect()
+        
+        # Check if all enemies are defeated
+        if len(self.enemies) == 0 and not self.enemies_defeated:
+            self.enemies_defeated = True
+            # Reveal all treasures
+            for treasure in self.treasures:
+                treasure.reveal()
+            # Unlock door
+            for door in self.doors:
+                door.unlock()
         
         # Check if player exited through door
         for door in self.doors:
@@ -209,13 +254,6 @@ class Game:
         # Check if player is dead
         if self.player.health <= 0:
             self.game_state = GAME_STATE_GAMEOVER
-        
-        # Check if all enemies are defeated and unlock door
-        if len(self.enemies) == 0:
-            for door in self.doors:
-                door.unlock()
-            # After a brief delay, allow level completion
-            # This is handled by the player exiting through the door
         
         # Check if we beat the final boss
         if self.level == BOSS_LEVEL and len(self.enemies) == 0:
@@ -246,6 +284,12 @@ class Game:
             if self.camera.is_visible(obstacle.rect):
                 offset_rect = self.camera.apply_offset(obstacle.rect)
                 self.screen.blit(obstacle.image, offset_rect)
+        
+        # Health pickups
+        for pickup in self.health_pickups:
+            if self.camera.is_visible(pickup.rect):
+                offset_rect = self.camera.apply_offset(pickup.rect)
+                self.screen.blit(pickup.image, offset_rect)
         
         # Treasures
         for treasure in self.treasures:

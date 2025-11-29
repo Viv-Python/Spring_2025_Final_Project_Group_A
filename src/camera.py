@@ -48,6 +48,9 @@ class Camera:
         # Player tracking settings
         self.player_offset_y = 0.3  # Keep player at 30% from top of screen
         self.deadzone_height = 100   # Vertical deadzone where camera doesn't move
+        
+        # Camera scroll threshold: only scroll upward once player is above this height
+        self.scroll_threshold_y = level_height - screen_height + 150  # Start scrolling when player gets high enough
 
     def update(self, player_rect):
         """
@@ -56,13 +59,18 @@ class Camera:
         Args:
             player_rect: pygame.Rect of the player
         """
-        # Calculate target position to keep player near center
-        # Player should be at (screen_height * player_offset_y) from top
-        target_y = player_rect.centery - (self.screen_height * self.player_offset_y)
-        
-        # Apply deadzone - camera doesn't move if player is within this zone
-        if abs(target_y - self.target_y) > self.deadzone_height:
-            self.target_y = target_y
+        # Only allow camera to scroll upward if player is above threshold
+        if player_rect.centery < self.scroll_threshold_y:
+            # Calculate target position to keep player near center
+            # Player should be at (screen_height * player_offset_y) from top
+            target_y = player_rect.centery - (self.screen_height * self.player_offset_y)
+            
+            # Apply deadzone - camera doesn't move if player is within this zone
+            if abs(target_y - self.target_y) > self.deadzone_height:
+                self.target_y = target_y
+        else:
+            # Below threshold, keep camera at bottom
+            self.target_y = self.level_height - self.screen_height
         
         # Apply smooth scrolling (lerp)
         if self.smooth_enabled:
