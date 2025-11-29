@@ -35,6 +35,8 @@ class Player(pygame.sprite.Sprite):
         self.attack_cooldown = 0
         self.facing_right = True
         self.attacks = pygame.sprite.Group()
+        self.falling_through = False
+        self.fall_through_timer = 0
 
     def handle_input(self):
         keys = pygame.key.get_pressed()
@@ -46,8 +48,14 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_RIGHT]:
             self.vel_x = base_speed
             self.facing_right = True
-        if keys[pygame.K_SPACE] and self.on_ground:
-            self.vel_y = -15
+        if keys[pygame.K_SPACE]:
+            if self.on_ground:
+                self.vel_y = -15
+            elif keys[pygame.K_DOWN] and not self.falling_through:
+                # Allow jumping down from non-ground platforms
+                self.falling_through = True
+                self.fall_through_timer = 10
+                self.vel_y = 5  # Start falling
         if keys[pygame.K_a]:
             self.attack()
 
@@ -85,16 +93,27 @@ class Player(pygame.sprite.Sprite):
             self.invuln_timer -= 1
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
+        
+        # Update fall-through timer
+        if self.fall_through_timer > 0:
+            self.fall_through_timer -= 1
+            if self.fall_through_timer == 0:
+                self.falling_through = False
 
         self.rect.x += self.vel_x
         self.rect.y += self.vel_y
         self.on_ground = False
         for platform in platforms:
             if self.rect.colliderect(platform.rect):
-                if self.vel_y > 0:
+                if self.vel_y > 0:  # Falling
+                    # Check if we're falling through (down key pressed)
+                    if self.falling_through:
+                        continue  # Skip collision, fall through
+                    
                     self.rect.bottom = platform.rect.top
                     self.vel_y = 0
                     self.on_ground = True
+                    self.falling_through = False
 
         # Enforce strict horizontal bounds
         if self.rect.left < 0:
@@ -107,6 +126,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.bottom = HEIGHT
             self.vel_y = 0
             self.on_ground = True
+            self.falling_through = False
 
         # Update attacks
         self.attacks.update()
@@ -124,4 +144,5 @@ class Player(pygame.sprite.Sprite):
     def heal(self, amount):
         """Heal the player"""
         self.health = min(self.health + amount, self.max_health)
+
 

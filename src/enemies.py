@@ -20,10 +20,10 @@ class Projectile(pygame.sprite.Sprite):
 
 
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, x, y, pattern='patrol', bounds=None, speed=2, health=20, melee_damage=10, ranged=False):
+    def __init__(self, x, y, pattern='patrol', bounds=None, speed=2, health=20, melee_damage=10, ranged=False, color=RED):
         super().__init__()
         self.image = pygame.Surface((ENEMY_SIZE, ENEMY_SIZE))
-        self.image.fill(RED)
+        self.image.fill(color)
         self.rect = self.image.get_rect(topleft=(x, y))
         self.speed = speed
         self.health = health
@@ -37,18 +37,32 @@ class Enemy(pygame.sprite.Sprite):
         self.fire_cooldown = 0
         self.sine_offset = 0
         self.hitbox = self.rect.copy()
+        self.color = color
+        self.spawn_x = x
+        self.spawn_y = y
+        self.current_platform = None
 
     def apply_gravity(self):
         self.vy += GRAVITY
         if self.vy > 10:
             self.vy = 10
 
-    def draw_health_bar(self, surface):
-        """Draw a health bar above the enemy"""
+    def draw_health_bar(self, surface, camera=None):
+        """
+        Draw a health bar above the enemy.
+        
+        Args:
+            surface: Pygame surface to draw on
+            camera: Optional Camera object to apply offset for scrolling
+        """
         bar_width = ENEMY_SIZE
         bar_height = 5
         bar_x = self.rect.x
         bar_y = self.rect.y - 10
+        
+        # Apply camera offset if provided (for scrolling support)
+        if camera is not None:
+            bar_x, bar_y = camera.apply_offset_pos(bar_x, bar_y)
         
         # Background (red)
         pygame.draw.rect(surface, RED, (bar_x, bar_y, bar_width, bar_height))
@@ -64,8 +78,13 @@ class Enemy(pygame.sprite.Sprite):
             self.rect.x += self.vx
             if self.bounds:
                 left, right = self.bounds
-                if self.rect.left < left or self.rect.right > right:
-                    self.vx *= -1
+                # Clamp to bounds instead of just bouncing
+                if self.rect.left <= left:
+                    self.rect.left = left
+                    self.vx = abs(self.vx)
+                elif self.rect.right >= right:
+                    self.rect.right = right
+                    self.vx = -abs(self.vx)
         elif self.pattern == 'chase':
             if player.rect.centerx < self.rect.centerx:
                 self.rect.x -= self.speed
@@ -79,11 +98,20 @@ class Enemy(pygame.sprite.Sprite):
         # simple gravity and platform collision
         self.apply_gravity()
         self.rect.y += self.vy
+        on_platform = False
         for p in platforms:
             if self.rect.colliderect(p.rect):
                 if self.vy > 0:
                     self.rect.bottom = p.rect.top
                     self.vy = 0
+                    on_platform = True
+                    self.current_platform = p
+
+        # Prevent enemies from falling off screen
+        if self.rect.bottom > HEIGHT:
+            self.rect.bottom = HEIGHT
+            self.vy = 0
+            on_platform = True
 
         # Update hitbox
         self.hitbox = self.rect.copy()
@@ -104,4 +132,5 @@ class Enemy(pygame.sprite.Sprite):
         self.health -= amount
         if self.health <= 0:
             self.kill()
+
 
