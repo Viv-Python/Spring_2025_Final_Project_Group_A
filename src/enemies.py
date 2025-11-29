@@ -1,6 +1,6 @@
 import pygame
 import math
-from settings import RED, ENEMY_SIZE, GRAVITY, WIDTH, HEIGHT, YELLOW
+from settings import RED, ENEMY_SIZE, GRAVITY, WIDTH, HEIGHT, YELLOW, GREEN, BLACK
 
 class Projectile(pygame.sprite.Sprite):
     def __init__(self, x, y, vx, vy=0, dmg=10):
@@ -27,6 +27,7 @@ class Enemy(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
         self.speed = speed
         self.health = health
+        self.max_health = health
         self.pattern = pattern
         self.bounds = bounds
         self.vx = speed
@@ -35,11 +36,27 @@ class Enemy(pygame.sprite.Sprite):
         self.ranged = ranged
         self.fire_cooldown = 0
         self.sine_offset = 0
+        self.hitbox = self.rect.copy()
 
     def apply_gravity(self):
         self.vy += GRAVITY
         if self.vy > 10:
             self.vy = 10
+
+    def draw_health_bar(self, surface):
+        """Draw a health bar above the enemy"""
+        bar_width = ENEMY_SIZE
+        bar_height = 5
+        bar_x = self.rect.x
+        bar_y = self.rect.y - 10
+        
+        # Background (red)
+        pygame.draw.rect(surface, RED, (bar_x, bar_y, bar_width, bar_height))
+        
+        # Health (green)
+        health_width = int(bar_width * (self.health / self.max_health))
+        if health_width > 0:
+            pygame.draw.rect(surface, GREEN, (bar_x, bar_y, health_width, bar_height))
 
     def update(self, player, platforms, projectiles_group=None):
         # movement patterns
@@ -68,6 +85,9 @@ class Enemy(pygame.sprite.Sprite):
                     self.rect.bottom = p.rect.top
                     self.vy = 0
 
+        # Update hitbox
+        self.hitbox = self.rect.copy()
+
         # ranged attack
         if self.ranged and projectiles_group is not None:
             if self.fire_cooldown <= 0:
@@ -79,7 +99,9 @@ class Enemy(pygame.sprite.Sprite):
             else:
                 self.fire_cooldown -= 1
 
-    def damage(self, amount):
+    def take_damage(self, amount):
+        """Enemy takes damage and is removed when health reaches zero"""
         self.health -= amount
         if self.health <= 0:
             self.kill()
+

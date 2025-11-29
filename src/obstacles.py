@@ -1,9 +1,9 @@
 import pygame
-from settings import OBSTACLE_SIZE, GRAY, RED, YELLOW, GREEN, BLUE
+from settings import OBSTACLE_SIZE, GRAY, RED, YELLOW, GREEN, BLUE, BLACK
 
 
 class Obstacle(pygame.sprite.Sprite):
-    def __init__(self, x, y, width=OBSTACLE_SIZE, height=OBSTACLE_SIZE, damage=0, blocking=False, speed_mod=1.0, color=GRAY, single_use=False):
+    def __init__(self, x, y, width=OBSTACLE_SIZE, height=OBSTACLE_SIZE, damage=0, blocking=False, speed_mod=1.0, color=GRAY, single_use=False, health=None):
         super().__init__()
         self.image = pygame.Surface((width, height))
         self.image.fill(color)
@@ -12,30 +12,61 @@ class Obstacle(pygame.sprite.Sprite):
         self.blocking = blocking
         self.speed_mod = speed_mod
         self.single_use = single_use
+        self.health = health
+        self.max_health = health
+        self.color = color
+        self.width = width
+        self.height = height
+        self.hitbox = self.rect.copy()
+
+    def take_damage(self, amount):
+        """Obstacle takes damage and is destroyed when health reaches zero"""
+        if self.health is not None:
+            self.health -= amount
+            if self.health <= 0:
+                self.kill()
+                return True
+        return False
+
+    def draw_health_bar(self, surface):
+        """Draw a health bar above the obstacle if it has health"""
+        if self.health is not None and self.max_health is not None:
+            bar_width = self.width
+            bar_height = 4
+            bar_x = self.rect.x
+            bar_y = self.rect.y - 8
+            
+            # Background (red)
+            pygame.draw.rect(surface, RED, (bar_x, bar_y, bar_width, bar_height))
+            
+            # Health (green)
+            health_width = int(bar_width * (self.health / self.max_health))
+            if health_width > 0:
+                pygame.draw.rect(surface, GREEN, (bar_x, bar_y, health_width, bar_height))
 
 
 def spike(x, y):
-    return Obstacle(x, y, damage=20, blocking=False, color=RED, single_use=False)
+    return Obstacle(x, y, damage=20, blocking=False, color=RED, single_use=False, health=1)
 
 
 def fire(x, y):
-    return Obstacle(x, y, damage=10, blocking=False, color=(255, 120, 0), single_use=False)
+    return Obstacle(x, y, damage=10, blocking=False, color=(255, 120, 0), single_use=False, health=2)
 
 
 def slow_trap(x, y):
-    return Obstacle(x, y, damage=0, blocking=False, speed_mod=0.5, color=(150, 150, 255))
+    return Obstacle(x, y, damage=0, blocking=False, speed_mod=0.5, color=(150, 150, 255), health=1)
 
 
 def slippery(x, y):
-    return Obstacle(x, y, damage=0, blocking=False, speed_mod=1.6, color=(200, 200, 255))
+    return Obstacle(x, y, damage=0, blocking=False, speed_mod=1.6, color=(200, 200, 255), health=1)
 
 
 def block(x, y, w=OBSTACLE_SIZE, h=OBSTACLE_SIZE):
-    return Obstacle(x, y, w, h, damage=0, blocking=True, color=(100, 100, 100))
+    return Obstacle(x, y, w, h, damage=0, blocking=True, color=(100, 100, 100), health=3)
 
 
 def falling_rock(x, y):
-    return Obstacle(x, y, damage=25, blocking=False, color=(80, 50, 30), single_use=True)
+    return Obstacle(x, y, damage=25, blocking=False, color=(80, 50, 30), single_use=True, health=2)
 
 
 def spike_row(x, y, count=3):
@@ -43,16 +74,17 @@ def spike_row(x, y, count=3):
 
 
 def poison_pool(x, y):
-    return Obstacle(x, y, damage=5, blocking=False, color=(50, 200, 50))
+    return Obstacle(x, y, damage=5, blocking=False, color=(50, 200, 50), health=1)
 
 
 def electric(x, y):
-    return Obstacle(x, y, damage=15, blocking=False, color=(180, 180, 255))
+    return Obstacle(x, y, damage=15, blocking=False, color=(180, 180, 255), health=2)
 
 
 def healing_plant(x, y):
-    return Obstacle(x, y, damage=-15, blocking=False, color=(120, 255, 120), single_use=True)
+    return Obstacle(x, y, damage=-15, blocking=False, color=(120, 255, 120), single_use=True, health=1)
 
 
 def bouncy(x, y):
-    return Obstacle(x, y, damage=0, blocking=False, color=(255, 150, 255), speed_mod=1.0)
+    return Obstacle(x, y, damage=0, blocking=False, color=(255, 150, 255), speed_mod=1.0, health=2)
+
