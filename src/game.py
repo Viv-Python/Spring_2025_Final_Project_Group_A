@@ -46,8 +46,8 @@ class Game:
 
     def init_level(self):
         """Initialize a new level with procedurally generated terrain and obstacles"""
-        # Player starts higher up to be on a natural ground platform (not at bottom)
-        self.player = Player(WIDTH // 2, HEIGHT - 120)
+        # Player starts at the bottom of the level (in world coordinates), not screen coordinates
+        self.player = Player(WIDTH // 2, LEVEL_HEIGHT - 120)
         self.platforms = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
         self.projectiles = pygame.sprite.Group()
@@ -174,6 +174,10 @@ class Game:
         
         # Update player
         self.player.update(self.platforms)
+        
+        # Update doors
+        for door in self.doors:
+            door.update()
         
         # Update enemies and projectiles
         for enemy in list(self.enemies):
@@ -337,19 +341,55 @@ class Game:
         """
         Draw parallax background layers to create depth perception.
         Background elements move slower than the foreground.
+        Different backgrounds for each level.
         """
-        # Calculate parallax offsets for different layers
         camera_y = self.camera.y
         
-        # Near background (moves almost with camera)
-        near_offset = int(camera_y * 0.7)
-        near_rect = pygame.Rect(0, -near_offset % HEIGHT, WIDTH, HEIGHT)
-        pygame.draw.rect(self.screen, (100, 50, 120), near_rect)
+        # Define level-specific color schemes
+        if self.level == 1:
+            # Level 1: Forest/Green theme
+            far_color = (20, 40, 20)      # Dark green
+            mid_color = (40, 80, 40)      # Forest green
+            near_color = (60, 120, 60)    # Light green
+        elif self.level == 2:
+            # Level 2: Sky/Blue theme
+            far_color = (30, 50, 100)     # Deep blue
+            mid_color = (50, 100, 150)    # Sky blue
+            near_color = (100, 150, 200)  # Light blue
+        elif self.level == 3:
+            # Level 3: Lava/Orange theme
+            far_color = (60, 20, 10)      # Dark red
+            mid_color = (120, 40, 20)     # Lava orange
+            near_color = (180, 80, 40)    # Light orange
+        elif self.level == BOSS_LEVEL:
+            # Boss level: Dark/Purple theme
+            far_color = (40, 10, 60)      # Dark purple
+            mid_color = (80, 20, 120)     # Purple
+            near_color = (140, 50, 180)   # Light purple
+        else:
+            # Default fallback
+            far_color = (80, 40, 100)
+            mid_color = (100, 50, 120)
+            near_color = (120, 70, 140)
         
         # Far background (moves slowly)
-        far_offset = int(camera_y * 0.3)
+        far_offset = int(camera_y * 0.2)
         far_rect = pygame.Rect(0, -far_offset % HEIGHT, WIDTH, HEIGHT)
-        pygame.draw.rect(self.screen, (80, 40, 100), far_rect)
+        pygame.draw.rect(self.screen, far_color, (0, 0, WIDTH, HEIGHT))
+        
+        # Mid background (moves at medium speed)
+        mid_offset = int(camera_y * 0.5)
+        mid_y = (-mid_offset % HEIGHT)
+        pygame.draw.rect(self.screen, mid_color, (0, mid_y, WIDTH, HEIGHT))
+        if mid_y > 0:
+            pygame.draw.rect(self.screen, mid_color, (0, mid_y - HEIGHT, WIDTH, HEIGHT))
+        
+        # Near background (moves with most parallax effect)
+        near_offset = int(camera_y * 0.7)
+        near_y = (-near_offset % HEIGHT)
+        pygame.draw.rect(self.screen, near_color, (0, near_y, WIDTH, HEIGHT))
+        if near_y > 0:
+            pygame.draw.rect(self.screen, near_color, (0, near_y - HEIGHT, WIDTH, HEIGHT))
     
     def _draw_ui(self):
         """
@@ -379,6 +419,17 @@ class Game:
         # Draw controls hint
         controls_text = self.small_font.render("Arrow Keys: Move | Space: Jump | A: Attack | Down+Space: Jump Down", True, (100, 100, 100))
         self.screen.blit(controls_text, (10, HEIGHT - 30))
+        
+        # Draw door unlock message if applicable
+        for door in self.doors:
+            if door.should_show_unlock_message():
+                unlock_text = self.font.render("DOOR UNLOCKED!", True, (0, 255, 0))
+                text_rect = unlock_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+                # Draw semi-transparent background for text
+                bg_rect = text_rect.inflate(40, 20)
+                pygame.draw.rect(self.screen, (0, 0, 0), bg_rect)
+                pygame.draw.rect(self.screen, (0, 255, 0), bg_rect, 3)
+                self.screen.blit(unlock_text, text_rect)
         
         # Optional: Draw camera debug info (can be toggled)
         # camera_info = self.camera.get_info()

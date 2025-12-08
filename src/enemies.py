@@ -89,6 +89,14 @@ class Enemy(pygame.sprite.Sprite):
                     self.rect.right = right
                     self.vx = -abs(self.vx)
             
+            # Failsafe: also enforce screen boundaries to prevent enemies from leaving the viewport
+            if self.rect.left < 0:
+                self.rect.left = 0
+                self.vx = abs(self.vx)
+            elif self.rect.right > WIDTH:
+                self.rect.right = WIDTH
+                self.vx = -abs(self.vx)
+            
             # Hopping behavior for patrol enemies
             if self.hop_pattern and self.hop_cooldown <= 0:
                 self.vy = -10  # Jump
@@ -98,10 +106,24 @@ class Enemy(pygame.sprite.Sprite):
                 self.rect.x -= self.speed
             else:
                 self.rect.x += self.speed
+            
+            # Enforce screen boundaries for chase enemies
+            if self.rect.left < 0:
+                self.rect.left = 0
+            elif self.rect.right > WIDTH:
+                self.rect.right = WIDTH
         elif self.pattern == 'sine':
             self.sine_offset += 0.05
             self.rect.y += int(math.sin(self.sine_offset) * 2)
             self.rect.x += self.vx
+            
+            # Enforce screen boundaries for sine enemies
+            if self.rect.left < 0:
+                self.rect.left = 0
+                self.vx = abs(self.vx)
+            elif self.rect.right > WIDTH:
+                self.rect.right = WIDTH
+                self.vx = -abs(self.vx)
             
             # Hopping behavior for sine enemies
             if self.hop_pattern and self.hop_cooldown <= 0:
@@ -112,17 +134,23 @@ class Enemy(pygame.sprite.Sprite):
         if self.hop_cooldown > 0:
             self.hop_cooldown -= 1
 
-        # simple gravity and platform collision
+        # Apply gravity and platform collision for all enemies
         self.apply_gravity()
         self.rect.y += self.vy
         on_platform = False
+        
         for p in platforms:
-            if self.rect.colliderect(p.rect):
-                if self.vy > 0:
+            # Use a slightly expanded platform rect for collision to avoid missing edge cases
+            check_rect = p.rect.inflate(0, 2)
+            
+            if self.rect.colliderect(check_rect):
+                if self.vy >= 0:  # Only collide when falling down or stationary
+                    # Land on platform
                     self.rect.bottom = p.rect.top
                     self.vy = 0
                     on_platform = True
                     self.current_platform = p
+                    break  # Don't check other platforms once landed
 
         # Prevent enemies from falling off screen
         if self.rect.bottom > HEIGHT:

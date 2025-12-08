@@ -34,12 +34,13 @@ class Camera:
         self.screen_height = screen_height
         
         # Camera position (top-left corner of visible area)
+        # Start at the bottom of the level
         self.x = 0.0
-        self.y = 0.0
+        self.y = max(0.0, level_height - screen_height)
         
         # Target position for smooth scrolling
         self.target_x = 0.0
-        self.target_y = 0.0
+        self.target_y = self.y
         
         # Smooth scrolling settings
         self.smooth_enabled = smooth_enabled
@@ -50,7 +51,8 @@ class Camera:
         self.deadzone_height = 100   # Vertical deadzone where camera doesn't move
         
         # Camera scroll threshold: only scroll upward once player is above this height
-        self.scroll_threshold_y = level_height - screen_height + 150  # Start scrolling when player gets high enough
+        # Start scrolling when player gets high enough (within top 30% of the screen)
+        self.scroll_threshold_y = level_height - screen_height + int(screen_height * 0.7)
 
     def update(self, player_rect):
         """

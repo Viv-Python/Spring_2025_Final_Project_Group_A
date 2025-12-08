@@ -84,7 +84,6 @@ class Player(pygame.sprite.Sprite):
 
     def update(self, platforms):
         self.handle_input()
-        self.apply_gravity()
         
         # update temporary modifiers
         if self.speed_mod_timer > 0:
@@ -109,21 +108,22 @@ class Player(pygame.sprite.Sprite):
         self.rect.y += self.vel_y
         self.on_ground = False
         
+        # Check collision with platforms
         for platform in platforms:
-            if self.rect.colliderect(platform.rect):
-                # Only collide from above when falling or standing normally
-                if self.vel_y >= 0:  # Only check when moving down or stationary
-                    # Check if we were above the platform before moving
-                    old_y = self.rect.y - self.vel_y
-                    if old_y + self.height <= platform.rect.top:
-                        # We came from above, so land on platform
-                        if self.falling_through:
-                            # If actively falling through, skip this platform
-                            continue
+            # Use a slightly expanded platform rect for collision to avoid missing edge cases
+            # This prevents the player from falling through when exactly on the platform surface
+            check_rect = platform.rect.inflate(0, 2)
+            
+            if self.rect.colliderect(check_rect):
+                if self.vel_y >= 0:  # Only collide when moving down or stationary
+                    # Player is landing on this platform
+                    if not self.falling_through:
+                        # Place player on top of platform
                         self.rect.bottom = platform.rect.top
                         self.vel_y = 0
                         self.on_ground = True
                         self.falling_through = False
+                        break  # Don't check other platforms once landed
 
         # Enforce strict horizontal bounds
         if self.rect.left < 0:
@@ -137,6 +137,14 @@ class Player(pygame.sprite.Sprite):
             self.vel_y = 0
             self.on_ground = True
             self.falling_through = False
+        
+        # Apply gravity AFTER collision check
+        # This ensures on_ground is properly set before gravity is applied
+        if not self.on_ground or self.vel_y < 0:
+            self.apply_gravity()
+        else:
+            # When on ground and not jumping, vel_y stays 0
+            self.vel_y = 0
 
         # Update attacks
         self.attacks.update()

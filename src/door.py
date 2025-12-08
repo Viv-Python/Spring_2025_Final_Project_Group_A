@@ -11,6 +11,7 @@ class Door(pygame.sprite.Sprite):
         self.image.fill((50, 50, 50))  # Dark gray when locked
         self.rect = self.image.get_rect(topleft=(x, y))
         self.unlocked = False
+        self.unlock_timer = 0  # Timer for showing unlock message
         self._draw_locked_state()
 
     def _draw_locked_state(self):
@@ -43,11 +44,21 @@ class Door(pygame.sprite.Sprite):
     def unlock(self):
         """Unlock the door when all enemies are defeated"""
         self.unlocked = True
+        self.unlock_timer = 120  # Show message for 120 frames (2 seconds at 60 FPS)
         self._draw_unlocked_state()
 
     def is_player_exiting(self, player_rect):
         """Check if player has collided with and exited through the door"""
         return self.unlocked and self.rect.colliderect(player_rect)
+    
+    def update(self):
+        """Update door state"""
+        if self.unlock_timer > 0:
+            self.unlock_timer -= 1
+    
+    def should_show_unlock_message(self):
+        """Check if unlock message should be displayed"""
+        return self.unlock_timer > 0
 
     def draw_locked_effect(self, surface):
         """Draw a locked indicator if not unlocked"""
