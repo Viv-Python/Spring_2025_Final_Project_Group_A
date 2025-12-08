@@ -6,8 +6,13 @@ class Attack(pygame.sprite.Sprite):
     def __init__(self, x, y, width=70, height=50, direction=1, damage=15):
         super().__init__()
         self.image = pygame.Surface((width, height))
-        self.image.fill((100, 200, 255))
-        self.image.set_alpha(100)  # Semi-transparent
+        # Draw a sword-like shape
+        self.image.fill((100, 100, 100))
+        pygame.draw.polygon(self.image, (200, 200, 100), [
+            (width // 2 - 5, 5), (width // 2 + 5, 5), 
+            (width // 2 + 3, height - 5), (width // 2 - 3, height - 5)
+        ])
+        self.image.set_alpha(180)  # Semi-transparent
         self.rect = self.image.get_rect(topleft=(x, y))
         self.damage = damage
         self.direction = direction
@@ -24,7 +29,14 @@ class Player(pygame.sprite.Sprite):
         self.width = PLAYER_WIDTH
         self.height = PLAYER_HEIGHT
         self.image = pygame.Surface((self.width, self.height))
+        # Draw a character sprite
         self.image.fill(BLUE)
+        # Draw a simple character face and body
+        pygame.draw.circle(self.image, (255, 200, 150), (self.width // 2, 12), 8)  # Head
+        pygame.draw.line(self.image, (255, 200, 150), (self.width // 2, 20), (self.width // 2, 40), 3)  # Body
+        pygame.draw.circle(self.image, (50, 50, 100), (self.width // 2 - 4, 12), 2)  # Left eye
+        pygame.draw.circle(self.image, (50, 50, 100), (self.width // 2 + 4, 12), 2)  # Right eye
+        
         self.rect = self.image.get_rect(topleft=(x, y))
         self.vel_x = 0
         self.vel_y = 0
@@ -39,6 +51,16 @@ class Player(pygame.sprite.Sprite):
         self.attacks = pygame.sprite.Group()
         self.falling_through = False
         self.fall_through_timer = 0
+        
+        # Power-up attributes
+        self.armor_active = False
+        self.armor_timer = 0
+        self.attack_mod = 1.0
+        self.attack_mod_timer = 0
+        
+        # Feedback timers
+        self.damage_taken_timer = 0
+        self.pickup_collected_timer = 0
 
     def handle_input(self):
         keys = pygame.key.get_pressed()
@@ -66,6 +88,9 @@ class Player(pygame.sprite.Sprite):
         if self.attack_cooldown <= 0:
             attack_width = 70  # Increased reach
             attack_height = 50
+            # Apply attack damage modifier from power-ups
+            base_damage = 15
+            final_damage = int(base_damage * self.attack_mod)
             if self.facing_right:
                 attack_x = self.rect.right
             else:
@@ -73,7 +98,7 @@ class Player(pygame.sprite.Sprite):
             
             attack = Attack(attack_x, self.rect.centery - attack_height // 2, 
                           attack_width, attack_height, 
-                          direction=1 if self.facing_right else -1, damage=15)
+                          direction=1 if self.facing_right else -1, damage=final_damage)
             self.attacks.add(attack)
             self.attack_cooldown = 15  # 15 frame cooldown
 
@@ -90,10 +115,22 @@ class Player(pygame.sprite.Sprite):
             self.speed_mod_timer -= 1
             if self.speed_mod_timer == 0:
                 self.speed_mod = 1.0
+        if self.attack_mod_timer > 0:
+            self.attack_mod_timer -= 1
+            if self.attack_mod_timer == 0:
+                self.attack_mod = 1.0
+        if self.armor_timer > 0:
+            self.armor_timer -= 1
+            if self.armor_timer == 0:
+                self.armor_active = False
         if self.invuln_timer > 0:
             self.invuln_timer -= 1
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
+        if self.damage_taken_timer > 0:
+            self.damage_taken_timer -= 1
+        if self.pickup_collected_timer > 0:
+            self.pickup_collected_timer -= 1
         
         # Update fall-through timer
         if self.fall_through_timer > 0:
@@ -152,15 +189,43 @@ class Player(pygame.sprite.Sprite):
     def take_damage(self, amount):
         if self.invuln_timer > 0:
             return
-        self.health -= amount
-        print(f"Player took {amount} damage; health={self.health}")
+        
+        # Apply armor reduction if active
+        actual_damage = amount
+        if self.armor_active:
+            actual_damage = int(amount * 0.5)  # 50% damage reduction
+        
+        self.health -= actual_damage
+        print(f"Player took {actual_damage} damage (armor: {self.armor_active}); health={self.health}")
         self.invuln_timer = 30
+        self.damage_taken_timer = 30  # Show damage feedback for 30 frames
+        
         if self.health <= 0:
             print("Player died")
             self.health = 0
+    
+    def activate_armor(self, duration=300):
+        """Activate armor power-up"""
+        self.armor_active = True
+        self.armor_timer = duration
+        print(f"Armor activated for {duration} frames!")
+    
+    def activate_attack(self, duration=300):
+        """Activate attack power-up"""
+        self.attack_mod = 1.5
+        self.attack_mod_timer = duration
+        print(f"Attack boost activated for {duration} frames!")
+    
+    def activate_speed(self, duration=300):
+        """Activate speed power-up"""
+        self.speed_mod = 1.5
+        self.speed_mod_timer = duration
+        print(f"Speed boost activated for {duration} frames!")
 
     def heal(self, amount):
         """Heal the player"""
         self.health = min(self.health + amount, self.max_health)
+        self.pickup_collected_timer = 30  # Show pickup feedback for 30 frames
+        print(f"Player healed by {amount}; health={self.health}")
 
 

@@ -14,12 +14,14 @@ from obstacles import spike, fire, slow_trap, slippery, block, falling_rock, spi
 from door import Door
 from treasure import Treasure
 from health_pickup import HealthPickup
+from powerup import ArmorPowerUp, AttackPowerUp, SpeedPowerUp
 from utils import generate_terrain, generate_obstacles
 
 
 class Game:
     def __init__(self, level=1, seed=None):
         pygame.init()
+        pygame.mixer.init()  # Initialize sound system
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Modular Pygame Game - Level Progression")
         self.clock = pygame.time.Clock()
@@ -42,7 +44,38 @@ class Game:
         )
         self.camera.set_player_tracking(CAMERA_PLAYER_OFFSET, CAMERA_DEADZONE)
         
+        # Music handling
+        self.victory_music_playing = False
+        self.try_load_victory_music()
+        
+        # Initialize the level after setting up music
         self.init_level()
+        
+    def try_load_victory_music(self):
+        """Try to load victory music from assets folder"""
+        import os
+        try:
+            # Look for music file in various locations
+            possible_paths = [
+                'assets/victory_music.mp3',
+                'assets/victory_music.wav',
+                'assets/victory_music.ogg',
+                'src/assets/victory_music.mp3',
+                'src/assets/victory_music.wav',
+                'src/assets/victory_music.ogg',
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    self.victory_music_path = path
+                    print(f"Victory music found at: {path}")
+                    return True
+            print("No victory music file found. Victory screen will play without music.")
+            self.victory_music_path = None
+            return False
+        except Exception as e:
+            print(f"Error loading victory music: {e}")
+            self.victory_music_path = None
+            return False
 
     def init_level(self):
         """Initialize a new level with procedurally generated terrain and obstacles"""
@@ -54,6 +87,7 @@ class Game:
         self.obstacles = pygame.sprite.Group()
         self.treasures = pygame.sprite.Group()
         self.health_pickups = pygame.sprite.Group()
+        self.powerups = pygame.sprite.Group()
         self.doors = pygame.sprite.Group()
         self.boss = None
         self.enemies_defeated = False
@@ -71,14 +105,18 @@ class Game:
         else:
             self.init_regular_level(difficulty)
         
-        # Generate obstacles for regular levels
+        # Generate obstacles for regular levels (4-6 obstacles instead of 10 to reduce clutter)
         if not is_boss:
-            obstacles_list = generate_obstacles(seed=self.seed + self.level * 100, count=10, difficulty=difficulty)
+            obstacles_count = random.randint(4, 6)
+            obstacles_list = generate_obstacles(seed=self.seed + self.level * 100, count=obstacles_count, difficulty=difficulty)
             for obstacle in obstacles_list:
                 self.obstacles.add(obstacle)
         
         # Add health pickups (1-3 per level, placed in challenging but accessible spots)
         self._spawn_health_pickups(difficulty)
+        
+        # Add power-ups (1-2 per level)
+        self._spawn_powerups(difficulty)
         
         # Door spawn: at top of level on the highest platform
         self._spawn_door()
@@ -87,7 +125,8 @@ class Game:
         self._spawn_treasure()
         
         self.all_sprites = pygame.sprite.Group(self.player, *self.platforms, *self.enemies, 
-                                               *self.obstacles, *self.treasures, *self.health_pickups, *self.doors)
+                                               *self.obstacles, *self.treasures, *self.health_pickups, 
+                                               *self.powerups, *self.doors)
         if self.boss:
             self.all_sprites.add(self.boss)
     
@@ -102,13 +141,27 @@ class Game:
             pickup = HealthPickup(x, y, heal_amount=heal_amount)
             self.health_pickups.add(pickup)
     
+    def _spawn_powerups(self, difficulty):
+        """Spawn 1-2 power-ups at random locations"""
+        num_powerups = random.randint(1, 2)
+        powerup_types = [ArmorPowerUp, AttackPowerUp, SpeedPowerUp]
+        
+        for _ in range(num_powerups):
+            x = random.randint(100, WIDTH - 100)
+            y = random.randint(150, HEIGHT - 200)
+            powerup_class = random.choice(powerup_types)
+            powerup = powerup_class(x, y, duration=300)  # 300 frames = 5 seconds at 60 FPS
+            self.powerups.add(powerup)
+    
     def _spawn_door(self):
-        """Spawn door at the top of the level on unobstructed terrain"""
-        # Place door on the topmost platform
+        """Spawn door sitting ON the topmost platform"""
+        # Find the topmost platform and place door on top of it
+        topmost_platform = min(self.platforms, key=lambda p: p.rect.y)
         door_width = 50
         door_height = 80
-        door_x = WIDTH // 2 - door_width // 2
-        door_y = 30  # High up, just below the top
+        # Place door ON the platform (door's bottom sits on platform's top)
+        door_x = topmost_platform.rect.centerx - door_width // 2
+        door_y = topmost_platform.rect.top - door_height  # Door sits on top
         door = Door(door_x, door_y, width=door_width, height=door_height)
         self.doors.add(door)
     
@@ -232,6 +285,17 @@ class Game:
             self.player.heal(pickup.heal_amount)
             pickup.collect()
         
+        # Power-up collection
+        powerup_hits = pygame.sprite.spritecollide(self.player, self.powerups, False)
+        for powerup in powerup_hits:
+            if powerup.powerup_type == "armor":
+                self.player.activate_armor(powerup.duration_remaining)
+            elif powerup.powerup_type == "attack":
+                self.player.activate_attack(powerup.duration_remaining)
+            elif powerup.powerup_type == "speed":
+                self.player.activate_speed(powerup.duration_remaining)
+            powerup.collect()
+        
         # Treasure collection
         treasure_hits = pygame.sprite.spritecollide(self.player, self.treasures, False)
         for treasure in treasure_hits:
@@ -260,9 +324,18 @@ class Game:
             self.game_state = GAME_STATE_GAMEOVER
         
         # Check if we beat the final boss
-        if self.level == BOSS_LEVEL and len(self.enemies) == 0:
-            # Player won!
-            self.game_state = GAME_STATE_GAMEOVER  # Show victory screen
+        if self.level == BOSS_LEVEL and len(self.enemies) == 0 and not self.enemies_defeated:
+            # Player won! Mark as enemies defeated to trigger victory sequence
+            self.enemies_defeated = True
+            self.boss_defeated_timer = 120  # Show victory for 2 seconds before triggering gameover
+        
+        # Auto-transition to game over screen after boss is defeated
+        if self.level == BOSS_LEVEL and self.enemies_defeated and len(self.enemies) == 0:
+            if not hasattr(self, 'boss_defeated_timer'):
+                self.boss_defeated_timer = 120
+            self.boss_defeated_timer -= 1
+            if self.boss_defeated_timer <= 0:
+                self.game_state = GAME_STATE_GAMEOVER
 
     def draw_game(self):
         """Draw the game scene with camera offset applied"""
@@ -294,6 +367,12 @@ class Game:
             if self.camera.is_visible(pickup.rect):
                 offset_rect = self.camera.apply_offset(pickup.rect)
                 self.screen.blit(pickup.image, offset_rect)
+        
+        # Power-ups
+        for powerup in self.powerups:
+            if self.camera.is_visible(powerup.rect):
+                offset_rect = self.camera.apply_offset(powerup.rect)
+                self.screen.blit(powerup.image, offset_rect)
         
         # Treasures
         for treasure in self.treasures:
@@ -394,10 +473,14 @@ class Game:
     def _draw_ui(self):
         """
         Draw UI elements that should stay fixed on screen (not scroll with camera).
-        Includes health, level, stickers, and controls.
+        Includes health, level, stickers, power-ups, and controls.
         """
         # Draw player health
-        health_text = self.small_font.render(f"Health: {self.player.health}/{self.player.max_health}", True, (0, 0, 0))
+        health_color = (0, 255, 0) if self.player.health > 50 else (255, 165, 0) if self.player.health > 25 else (255, 0, 0)
+        # Add damage feedback effect
+        if self.player.damage_taken_timer > 0:
+            health_color = (255, 0, 0)
+        health_text = self.small_font.render(f"Health: {self.player.health}/{self.player.max_health}", True, health_color)
         self.screen.blit(health_text, (10, 10))
         
         # Draw level
@@ -415,6 +498,28 @@ class Game:
                 pygame.draw.circle(self.screen, (255, 215, 0), (sticker_x + i * 20, 40), 5)
             else:
                 pygame.draw.circle(self.screen, (200, 200, 200), (sticker_x + i * 20, 40), 5)
+        
+        # Draw active power-ups with duration
+        powerup_y = 70
+        if self.player.armor_active:
+            armor_text = self.small_font.render(f"ARMOR: {self.player.armor_timer // 60}s", True, (150, 150, 150))
+            self.screen.blit(armor_text, (10, powerup_y))
+            powerup_y += 25
+        
+        if self.player.attack_mod > 1.0:
+            attack_text = self.small_font.render(f"ATTACK+: {self.player.attack_mod_timer // 60}s", True, (255, 100, 100))
+            self.screen.blit(attack_text, (10, powerup_y))
+            powerup_y += 25
+        
+        if self.player.speed_mod > 1.0:
+            speed_text = self.small_font.render(f"SPEED+: {self.player.speed_mod_timer // 60}s", True, (200, 0, 200))
+            self.screen.blit(speed_text, (10, powerup_y))
+            powerup_y += 25
+        
+        # Draw pickup collected feedback
+        if self.player.pickup_collected_timer > 0:
+            pickup_text = self.small_font.render("HEALTH +", True, (0, 255, 0))
+            self.screen.blit(pickup_text, (WIDTH - 150, 50))
         
         # Draw controls hint
         controls_text = self.small_font.render("Arrow Keys: Move | Space: Jump | A: Attack | Down+Space: Jump Down", True, (100, 100, 100))
@@ -440,15 +545,30 @@ class Game:
         """Draw the game over screen"""
         self.screen.fill(WHITE)
         
-        if self.level > BOSS_LEVEL:
-            # Victory screen
-            victory_text = self.font.render("YOU WIN!", True, (0, 200, 0))
-            final_text = self.small_font.render(f"Final Stickers: {len(self.collected_stickers)}", True, (0, 0, 0))
-            restart_text = self.small_font.render("Press R to Play Again or Q to Quit", True, BLACK)
+        # Check if player won by defeating the boss
+        if self.level == BOSS_LEVEL and self.enemies_defeated and len(self.enemies) == 0:
+            # Victory screen - YOU WON!!
+            # Play victory music once
+            if not self.victory_music_playing and self.victory_music_path:
+                try:
+                    pygame.mixer.music.load(self.victory_music_path)
+                    pygame.mixer.music.play(-1)  # Loop the music
+                    self.victory_music_playing = True
+                    print("Victory music started playing!")
+                except Exception as e:
+                    print(f"Error playing victory music: {e}")
             
-            self.screen.blit(victory_text, (WIDTH // 2 - 120, HEIGHT // 2 - 100))
-            self.screen.blit(final_text, (WIDTH // 2 - 100, HEIGHT // 2 - 20))
-            self.screen.blit(restart_text, (WIDTH // 2 - 150, HEIGHT // 2 + 60))
+            self.screen.fill((50, 100, 50))  # Dark green background
+            
+            victory_text = pygame.font.Font(None, 80).render("YOU WON!!", True, (0, 255, 0))
+            subtitle_text = self.font.render("You defeated the Boss and collected the treasure!", True, (255, 255, 0))
+            final_text = self.small_font.render(f"Final Stickers Collected: {len(self.collected_stickers)}/10", True, (255, 255, 255))
+            restart_text = self.small_font.render("Press R to Play Again or Q to Quit", True, (200, 200, 200))
+            
+            self.screen.blit(victory_text, (WIDTH // 2 - 200, HEIGHT // 2 - 150))
+            self.screen.blit(subtitle_text, (WIDTH // 2 - 230, HEIGHT // 2 - 50))
+            self.screen.blit(final_text, (WIDTH // 2 - 150, HEIGHT // 2 + 30))
+            self.screen.blit(restart_text, (WIDTH // 2 - 150, HEIGHT // 2 + 100))
         else:
             # Defeat screen
             gameover_text = self.font.render("GAME OVER", True, (255, 0, 0))

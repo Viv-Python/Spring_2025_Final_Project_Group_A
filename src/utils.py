@@ -40,25 +40,30 @@ def generate_terrain(seed=None, difficulty=1, is_boss=False):
         
         # Generate vertical platforms for tall levels
         # Use more platforms but with varied vertical spacing
-        min_gap = 80 - (difficulty * 20)
-        max_gap = 150 - (difficulty * 30)
+        # Increased min_gap to prevent super jumps and ensure systematic spacing
+        min_gap = 150 - (difficulty * 20)
+        max_gap = 220 - (difficulty * 30)
         min_platform_width = 100 + (difficulty * 20)
         max_platform_width = 200 + (difficulty * 30)
         
-        y = HEIGHT - 150
+        # Start the first platform closer to the ground to maintain consistent spacing
+        y = HEIGHT - 40 - random.randint(min_gap, max_gap)
         x = random.randint(50, WIDTH - 150)
         
-        # Generate platforms all the way to the top
-        while y > 60:
+        # Generate platforms with consistent spacing all the way to near the top
+        # Keep generating until we're close to the top (y < 100)
+        while y > 100:
             platform_width = random.randint(min_platform_width, max_platform_width)
             x = max(50, min(x + random.randint(-80, 80), WIDTH - platform_width - 50))
             platforms.append(Platform(x, y, platform_width, 20))
-            y -= random.randint(min_gap, max_gap)
+            gap = random.randint(min_gap, max_gap)
+            y -= gap
         
-        # Add a platform at the top
-        top_platform_width = random.randint(min_platform_width, max_platform_width)
-        top_x = (WIDTH - top_platform_width) // 2
-        platforms.append(Platform(top_x, 50, top_platform_width, 20))
+        # If there's still space, add a final platform at the top
+        if y > 40:
+            top_platform_width = random.randint(min_platform_width, max_platform_width)
+            top_x = (WIDTH - top_platform_width) // 2
+            platforms.append(Platform(top_x, y, top_platform_width, 20))
     
     return platforms
 
@@ -88,16 +93,11 @@ def generate_obstacles(seed=None, count=10, difficulty=1):
     for _ in range(count):
         obstacle_type = random.choice(obstacle_types)
         x = random.randint(0, WIDTH - OBSTACLE_SIZE)
-        y = random.randint(100, HEIGHT - OBSTACLE_SIZE - 80)
+        y = random.randint(150, HEIGHT - OBSTACLE_SIZE - 100)
         
-        # Sometimes create spike_row instead of single obstacle
-        if obstacle_type == spike and random.random() < 0.3:
-            from obstacles import spike_row
-            count_spikes = random.randint(2, 4)
-            for s in spike_row(x, y, count=count_spikes):
-                obstacles.append(s)
-        else:
-            obstacles.append(obstacle_type(x, y))
+        # Avoid creating spike_row to keep obstacle count manageable
+        # Single obstacles only to meet the 4-6 constraint
+        obstacles.append(obstacle_type(x, y))
     
     return obstacles
 
