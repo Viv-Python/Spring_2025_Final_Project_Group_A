@@ -1,6 +1,7 @@
 import pygame
 import math
 from settings import RED, ENEMY_SIZE, GRAVITY, WIDTH, HEIGHT, YELLOW, GREEN, BLACK
+from asset_loader import get_loader
 
 class Projectile(pygame.sprite.Sprite):
     def __init__(self, x, y, vx, vy=0, dmg=10):
@@ -22,8 +23,20 @@ class Projectile(pygame.sprite.Sprite):
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, pattern='patrol', bounds=None, speed=2, health=20, melee_damage=10, ranged=False, color=RED):
         super().__init__()
-        self.image = pygame.Surface((ENEMY_SIZE, ENEMY_SIZE))
-        self.image.fill(color)
+        
+        # Try to load enemy sprite from assets
+        loader = get_loader()
+        enemy_sprite = loader.get_enemy_sprite('forest_creature')
+        if enemy_sprite is not None:
+            # Scale sprite to match enemy dimensions
+            self.image = pygame.transform.scale(enemy_sprite, (ENEMY_SIZE, ENEMY_SIZE))
+            print(f"✓ Enemy sprite loaded successfully ({ENEMY_SIZE}x{ENEMY_SIZE})")
+        else:
+            # Fallback: draw colored sprite
+            self.image = pygame.Surface((ENEMY_SIZE, ENEMY_SIZE))
+            self.image.fill(color)
+            print("⚠ Enemy sprite not found, using fallback")
+        
         self.rect = self.image.get_rect(topleft=(x, y))
         self.speed = speed
         self.health = health

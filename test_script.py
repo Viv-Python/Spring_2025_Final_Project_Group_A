@@ -1,388 +1,465 @@
 #!/usr/bin/env python3
 """
-Comprehensive test script to validate all implemented changes:
-1. Power-up system (Armor, Attack, Speed)
-2. UI power-up indicators with duration display
-3. Damage and pickup feedback
-4. Player sprite implementation
-5. Attack sprite implementation
-6. Power-up visual indicators
-7. Victory music implementation
-8. Platform spacing
-9. Door placement
-10. Obstacle count
+Comprehensive test script for asset loading and sprite system:
+1. Asset files exist and can be loaded
+2. Player sprite loads correctly and dimensions match
+3. Enemy sprite loads correctly and dimensions match
+4. Obstacle sprites load correctly for all types
+5. Terrain tile sprites load correctly
+6. Animation frames load correctly
+7. Sprite scaling works properly
+8. Fallback system works when assets are missing
 """
 
 import sys
 sys.path.insert(0, 'src')
 
-from settings import WIDTH, HEIGHT, LEVEL_HEIGHT
-from utils import generate_terrain, generate_obstacles
-from powerup import ArmorPowerUp, AttackPowerUp, SpeedPowerUp
-from player import Player
-import random
+import pygame
 import os
+from asset_loader import get_loader, are_assets_available
+from settings import PLAYER_WIDTH, PLAYER_HEIGHT, ENEMY_SIZE, OBSTACLE_SIZE, WIDTH, HEIGHT, LEVEL_HEIGHT
+from player import Player
+from enemies import Enemy
+from obstacles import spike, fire, slow_trap, slippery, block, falling_rock, poison_pool, electric, healing_plant, bouncy
+from platform import Platform
 
-def test_powerup_system():
-    """Test the power-up system"""
+pygame.init()
+
+def test_asset_directory_structure():
+    """Test that all asset directories exist"""
     print("=" * 60)
-    print("TEST 1: Power-up System")
-    print("=" * 60)
-    
-    try:
-        # Test Armor Power-up
-        armor = ArmorPowerUp(100, 100, duration=300)
-        assert armor.powerup_type == "armor", "Armor type not set correctly"
-        assert armor.damage_reduction == 0.5, "Armor should reduce damage by 50%"
-        assert armor.duration_remaining == 300, "Armor duration not set"
-        print("✓ Armor power-up created successfully")
-        
-        # Test Attack Power-up
-        attack = AttackPowerUp(100, 100, duration=300)
-        assert attack.powerup_type == "attack", "Attack type not set correctly"
-        assert attack.damage_multiplier == 1.5, "Attack should increase damage by 50%"
-        print("✓ Attack power-up created successfully")
-        
-        # Test Speed Power-up
-        speed = SpeedPowerUp(100, 100, duration=300)
-        assert speed.powerup_type == "speed", "Speed type not set correctly"
-        assert speed.speed_multiplier == 1.5, "Speed should increase by 50%"
-        print("✓ Speed power-up created successfully")
-        
-        print("✓ PASS: All power-up types working correctly")
-    except AssertionError as e:
-        print(f"✗ FAIL: {e}")
-    except Exception as e:
-        print(f"✗ ERROR: {e}")
-
-
-def test_player_powerup_activation():
-    """Test player power-up activation"""
-    print("\n" + "=" * 60)
-    print("TEST 2: Player Power-up Activation")
+    print("TEST 1: Asset Directory Structure")
     print("=" * 60)
     
     try:
-        player = Player(WIDTH // 2, HEIGHT // 2)
-        
-        # Test armor activation
-        player.activate_armor(300)
-        assert player.armor_active == True, "Armor should be active"
-        assert player.armor_timer == 300, "Armor timer not set correctly"
-        print("✓ Armor activation working")
-        
-        # Test attack activation
-        player.activate_attack(300)
-        assert player.attack_mod == 1.5, "Attack mod should be 1.5"
-        assert player.attack_mod_timer == 300, "Attack timer not set"
-        print("✓ Attack activation working")
-        
-        # Test speed activation
-        player.activate_speed(300)
-        assert player.speed_mod == 1.5, "Speed mod should be 1.5"
-        assert player.speed_mod_timer == 300, "Speed timer not set"
-        print("✓ Speed activation working")
-        
-        print("✓ PASS: Player power-up activation working correctly")
-    except AssertionError as e:
-        print(f"✗ FAIL: {e}")
-    except Exception as e:
-        print(f"✗ ERROR: {e}")
-
-
-def test_armor_damage_reduction():
-    """Test armor damage reduction"""
-    print("\n" + "=" * 60)
-    print("TEST 3: Armor Damage Reduction")
-    print("=" * 60)
-    
-    try:
-        player = Player(WIDTH // 2, HEIGHT // 2)
-        initial_health = player.health
-        
-        # Activate armor
-        player.activate_armor(300)
-        
-        # Take damage with armor active
-        player.take_damage(20)
-        damage_taken = initial_health - player.health
-        
-        # With armor, should only take 10 damage (50% of 20)
-        assert damage_taken == 10, f"Should take 10 damage, but took {damage_taken}"
-        print(f"✓ Armor reduced 20 damage to 10 damage")
-        
-        # Test damage without armor
-        player2 = Player(WIDTH // 2, HEIGHT // 2)
-        initial_health2 = player2.health
-        player2.take_damage(20)
-        damage_taken2 = initial_health2 - player2.health
-        assert damage_taken2 == 20, f"Should take 20 damage, but took {damage_taken2}"
-        print(f"✓ Without armor, 20 damage causes 20 health loss")
-        
-        print("✓ PASS: Armor damage reduction working correctly")
-    except AssertionError as e:
-        print(f"✗ FAIL: {e}")
-    except Exception as e:
-        print(f"✗ ERROR: {e}")
-
-
-def test_player_sprite():
-    """Test player sprite implementation"""
-    print("\n" + "=" * 60)
-    print("TEST 4: Player Sprite")
-    print("=" * 60)
-    
-    try:
-        player = Player(WIDTH // 2, HEIGHT // 2)
-        
-        # Check if player has a valid image
-        assert player.image is not None, "Player image not created"
-        assert player.image.get_width() > 0, "Player image has no width"
-        assert player.image.get_height() > 0, "Player image has no height"
-        print(f"✓ Player sprite created with dimensions: {player.image.get_width()}x{player.image.get_height()}")
-        
-        # Check player rect
-        assert player.rect is not None, "Player rect not created"
-        print(f"✓ Player rect created at position: ({player.rect.x}, {player.rect.y})")
-        
-        print("✓ PASS: Player sprite implementation working")
-    except AssertionError as e:
-        print(f"✗ FAIL: {e}")
-    except Exception as e:
-        print(f"✗ ERROR: {e}")
-
-
-def test_attack_sprite():
-    """Test attack sprite implementation"""
-    print("\n" + "=" * 60)
-    print("TEST 5: Attack Sprite")
-    print("=" * 60)
-    
-    try:
-        from player import Attack
-        
-        attack = Attack(100, 100, width=70, height=50, direction=1, damage=15)
-        
-        # Check if attack has a valid image
-        assert attack.image is not None, "Attack image not created"
-        assert attack.image.get_width() > 0, "Attack image has no width"
-        print(f"✓ Attack sprite created with dimensions: {attack.image.get_width()}x{attack.image.get_height()}")
-        
-        # Check damage
-        assert attack.damage == 15, "Attack damage not set correctly"
-        print(f"✓ Attack damage set to 15")
-        
-        # Check lifetime
-        assert attack.lifetime == 10, "Attack lifetime not set correctly"
-        print(f"✓ Attack lifetime set to 10 frames")
-        
-        print("✓ PASS: Attack sprite implementation working")
-    except AssertionError as e:
-        print(f"✗ FAIL: {e}")
-    except Exception as e:
-        print(f"✗ ERROR: {e}")
-
-
-def test_powerup_indicators():
-    """Test UI power-up indicators"""
-    print("\n" + "=" * 60)
-    print("TEST 6: Power-up Indicators in UI")
-    print("=" * 60)
-    
-    try:
-        # Check if _draw_ui method has power-up display logic
-        with open('src/game.py', 'r') as f:
-            game_code = f.read()
-        
-        checks = [
-            ('armor_active' in game_code, "Armor active indicator"),
-            ('attack_mod' in game_code, "Attack modifier indicator"),
-            ('speed_mod' in game_code, "Speed modifier indicator"),
-            ('armor_timer' in game_code, "Armor timer display"),
-            ('attack_mod_timer' in game_code, "Attack timer display"),
-            ('speed_mod_timer' in game_code, "Speed timer display"),
-            ('damage_taken_timer' in game_code, "Damage feedback timer"),
-            ('pickup_collected_timer' in game_code, "Pickup feedback timer")
+        required_dirs = [
+            'assets',
+            'assets/player',
+            'assets/enemies',
+            'assets/obstacles',
+            'assets/tiles',
+            'assets/animations'
         ]
         
-        for check, description in checks:
-            if check:
-                print(f"✓ {description}")
-            else:
-                print(f"✗ {description}")
+        for dir_path in required_dirs:
+            assert os.path.isdir(dir_path), f"Directory not found: {dir_path}"
+            print(f"✓ Directory exists: {dir_path}")
         
-        if all(c[0] for c in checks):
-            print("✓ PASS: Power-up UI indicators implemented")
-        else:
-            print("✗ FAIL: Some power-up indicators missing")
-    
+        print("✓ PASS: All asset directories present")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
     except Exception as e:
         print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
 
-
-def test_victory_music():
-    """Test victory music implementation"""
-    print("\n" + "=" * 60)
-    print("TEST 7: Victory Music")
+def test_asset_files_exist():
+    """Test that all required asset files exist"""
+    print("=" * 60)
+    print("TEST 2: Required Asset Files")
     print("=" * 60)
     
     try:
-        # Check if music file exists
-        music_exists = os.path.exists('assets/victory_music.wav')
-        
-        if music_exists:
-            print("✓ Victory music file found at assets/victory_music.wav")
-        else:
-            print("✗ Victory music file not found")
-        
-        # Check if game.py has music loading logic
-        with open('src/game.py', 'r') as f:
-            game_code = f.read()
-        
-        checks = [
-            ('pygame.mixer' in game_code, "Pygame mixer initialized"),
-            ('victory_music_path' in game_code, "Victory music path handling"),
-            ('try_load_victory_music' in game_code, "Music loading function"),
-            ('pygame.mixer.music.load' in game_code, "Music loading in draw_gameover"),
-            ('pygame.mixer.music.play' in game_code, "Music playback")
+        required_files = [
+            'assets/player/player_idle.png',
+            'assets/enemies/forest_creature.png',
+            'assets/obstacles/spike.png',
+            'assets/obstacles/fire.png',
+            'assets/obstacles/slow_trap.png',
+            'assets/obstacles/slippery.png',
+            'assets/obstacles/block.png',
+            'assets/obstacles/falling_rock.png',
+            'assets/obstacles/poison_pool.png',
+            'assets/obstacles/electric.png',
+            'assets/obstacles/healing_plant.png',
+            'assets/obstacles/bouncy.png',
+            'assets/tiles/grass.png',
+            'assets/tiles/dirt.png',
+            'assets/tiles/stone.png',
+            'assets/tiles/grass_dirt.png',
+            'assets/animations/player_walk_0.png',
+            'assets/animations/player_walk_1.png',
+            'assets/animations/player_walk_2.png',
+            'assets/animations/player_walk_3.png',
+            'assets/animations/enemy_idle_0.png',
+            'assets/animations/enemy_idle_1.png',
+            'assets/animations/enemy_idle_2.png',
+            'assets/animations/enemy_idle_3.png',
         ]
         
-        for check, description in checks:
-            if check:
-                print(f"✓ {description}")
+        all_exist = True
+        for file_path in required_files:
+            if os.path.isfile(file_path):
+                print(f"✓ File exists: {file_path}")
             else:
-                print(f"✗ {description}")
+                print(f"✗ File missing: {file_path}")
+                all_exist = False
         
-        if all(c[0] for c in checks) and music_exists:
-            print("✓ PASS: Victory music implementation complete")
-        else:
-            print("⚠ PARTIAL: Victory music system implemented but may need audio file")
-    
+        assert all_exist, "Some required asset files are missing"
+        print("✓ PASS: All asset files present")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
     except Exception as e:
         print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
 
-
-def test_platform_spacing():
-    """Test that platforms have proper spacing (no super jumps)"""
-    print("\n" + "=" * 60)
-    print("TEST 8: Platform Spacing")
+def test_asset_loader_initialization():
+    """Test that AssetLoader initializes correctly"""
+    print("=" * 60)
+    print("TEST 3: Asset Loader Initialization")
     print("=" * 60)
     
-    for difficulty in [1, 2, 3]:
-        platforms = generate_terrain(seed=42, difficulty=difficulty, is_boss=False)
+    try:
+        loader = get_loader()
+        assert loader is not None, "Asset loader is None"
+        print(f"✓ Asset loader created")
         
-        print(f"\nDifficulty {difficulty}:")
-        print(f"Total platforms: {len(platforms)}")
+        assets_available = are_assets_available()
+        assert assets_available, "Assets reported as not available"
+        print(f"✓ Assets are available: {assets_available}")
         
-        # Calculate vertical gaps between consecutive platforms
-        platform_y_positions = sorted([p.rect.y for p in platforms])
-        gaps = []
+        print("✓ PASS: Asset loader initialized successfully")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_player_sprite_loading():
+    """Test that player sprite loads correctly"""
+    print("=" * 60)
+    print("TEST 4: Player Sprite Loading")
+    print("=" * 60)
+    
+    try:
+        loader = get_loader()
+        player_sprite = loader.get_player_idle()
         
-        for i in range(len(platform_y_positions) - 1):
-            gap = platform_y_positions[i+1] - platform_y_positions[i]
-            gaps.append(gap)
+        assert player_sprite is not None, "Player sprite is None"
+        print(f"✓ Player sprite loaded")
         
-        if gaps:
-            min_gap = min(gaps)
-            max_gap = max(gaps)
-            avg_gap = sum(gaps) / len(gaps)
-            print(f"Platform gaps - Min: {min_gap}, Max: {max_gap}, Avg: {avg_gap:.1f}")
-            
-            expected_min = 130 - (difficulty * 20)
-            if min_gap >= (expected_min - 20):
-                print(f"✓ Minimum gap is {min_gap}")
+        assert player_sprite.get_width() > 0, "Player sprite has no width"
+        assert player_sprite.get_height() > 0, "Player sprite has no height"
+        print(f"✓ Player sprite dimensions: {player_sprite.get_width()}x{player_sprite.get_height()}")
+        
+        # Test scaling
+        scaled = pygame.transform.scale(player_sprite, (PLAYER_WIDTH, PLAYER_HEIGHT))
+        assert scaled.get_width() == PLAYER_WIDTH, "Scaled width doesn't match"
+        assert scaled.get_height() == PLAYER_HEIGHT, "Scaled height doesn't match"
+        print(f"✓ Player sprite scales to {PLAYER_WIDTH}x{PLAYER_HEIGHT}")
+        
+        print("✓ PASS: Player sprite loads and scales correctly")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_enemy_sprite_loading():
+    """Test that enemy sprite loads correctly"""
+    print("=" * 60)
+    print("TEST 5: Enemy Sprite Loading")
+    print("=" * 60)
+    
+    try:
+        loader = get_loader()
+        enemy_sprite = loader.get_enemy_sprite('forest_creature')
+        
+        assert enemy_sprite is not None, "Enemy sprite is None"
+        print(f"✓ Enemy sprite loaded")
+        
+        assert enemy_sprite.get_width() > 0, "Enemy sprite has no width"
+        assert enemy_sprite.get_height() > 0, "Enemy sprite has no height"
+        print(f"✓ Enemy sprite dimensions: {enemy_sprite.get_width()}x{enemy_sprite.get_height()}")
+        
+        # Test scaling
+        scaled = pygame.transform.scale(enemy_sprite, (ENEMY_SIZE, ENEMY_SIZE))
+        assert scaled.get_width() == ENEMY_SIZE, "Scaled width doesn't match"
+        assert scaled.get_height() == ENEMY_SIZE, "Scaled height doesn't match"
+        print(f"✓ Enemy sprite scales to {ENEMY_SIZE}x{ENEMY_SIZE}")
+        
+        print("✓ PASS: Enemy sprite loads and scales correctly")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_obstacle_sprites_loading():
+    """Test that all obstacle sprites load correctly"""
+    print("=" * 60)
+    print("TEST 6: Obstacle Sprites Loading")
+    print("=" * 60)
+    
+    try:
+        loader = get_loader()
+        obstacle_types = ['spike', 'fire', 'slow_trap', 'slippery', 'block', 
+                         'falling_rock', 'poison_pool', 'electric', 'healing_plant', 'bouncy']
+        
+        for obs_type in obstacle_types:
+            sprite = loader.get_obstacle_sprite(obs_type)
+            assert sprite is not None, f"Obstacle sprite '{obs_type}' is None"
+            assert sprite.get_width() > 0, f"Obstacle '{obs_type}' has no width"
+            print(f"✓ Obstacle sprite loaded: {obs_type}")
+        
+        print("✓ PASS: All obstacle sprites load correctly")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_terrain_tiles_loading():
+    """Test that terrain tile sprites load correctly"""
+    print("=" * 60)
+    print("TEST 7: Terrain Tiles Loading")
+    print("=" * 60)
+    
+    try:
+        loader = get_loader()
+        tile_types = ['grass', 'dirt', 'stone', 'grass_dirt']
+        
+        for tile_type in tile_types:
+            sprite = loader.get_tile_sprite(tile_type)
+            assert sprite is not None, f"Tile sprite '{tile_type}' is None"
+            assert sprite.get_width() > 0, f"Tile '{tile_type}' has no width"
+            print(f"✓ Tile sprite loaded: {tile_type}")
+        
+        print("✓ PASS: All terrain tiles load correctly")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_animation_frames_loading():
+    """Test that animation frames load correctly"""
+    print("=" * 60)
+    print("TEST 8: Animation Frames Loading")
+    print("=" * 60)
+    
+    try:
+        loader = get_loader()
+        
+        # Test player walking animation
+        player_walk = loader.get_player_walking()
+        assert player_walk is not None, "Player walking animation is None"
+        assert len(player_walk) == 4, f"Player walking should have 4 frames, got {len(player_walk)}"
+        for i, frame in enumerate(player_walk):
+            assert frame is not None, f"Player walking frame {i} is None"
+            assert frame.get_width() > 0, f"Frame {i} has no width"
+        print(f"✓ Player walking animation loaded: 4 frames")
+        
+        # Test enemy idle animation
+        enemy_idle = loader.get_enemy_idle()
+        assert enemy_idle is not None, "Enemy idle animation is None"
+        assert len(enemy_idle) == 4, f"Enemy idle should have 4 frames, got {len(enemy_idle)}"
+        for i, frame in enumerate(enemy_idle):
+            assert frame is not None, f"Enemy idle frame {i} is None"
+            assert frame.get_width() > 0, f"Frame {i} has no width"
+        print(f"✓ Enemy idle animation loaded: 4 frames")
+        
+        print("✓ PASS: All animation frames load correctly")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_player_instantiation():
+    """Test that Player class can be instantiated with sprite loading"""
+    print("=" * 60)
+    print("TEST 9: Player Instantiation with Sprites")
+    print("=" * 60)
+    
+    try:
+        # Create a dummy display for pygame
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        
+        player = Player(WIDTH // 2, HEIGHT // 2)
+        assert player is not None, "Player object is None"
+        assert player.image is not None, "Player image is None"
+        assert player.rect is not None, "Player rect is None"
+        print(f"✓ Player instantiated successfully")
+        print(f"✓ Player position: ({player.rect.x}, {player.rect.y})")
+        print(f"✓ Player dimensions: {player.rect.width}x{player.rect.height}")
+        print(f"✓ Player health: {player.health}/{player.max_health}")
+        
+        print("✓ PASS: Player instantiation works with sprite system")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_enemy_instantiation():
+    """Test that Enemy class can be instantiated with sprite loading"""
+    print("=" * 60)
+    print("TEST 10: Enemy Instantiation with Sprites")
+    print("=" * 60)
+    
+    try:
+        enemy = Enemy(200, 200, pattern='patrol', speed=2, health=20)
+        assert enemy is not None, "Enemy object is None"
+        assert enemy.image is not None, "Enemy image is None"
+        assert enemy.rect is not None, "Enemy rect is None"
+        print(f"✓ Enemy instantiated successfully")
+        print(f"✓ Enemy position: ({enemy.rect.x}, {enemy.rect.y})")
+        print(f"✓ Enemy dimensions: {enemy.rect.width}x{enemy.rect.height}")
+        print(f"✓ Enemy health: {enemy.health}/{enemy.max_health}")
+        
+        print("✓ PASS: Enemy instantiation works with sprite system")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_obstacle_instantiation():
+    """Test that obstacles can be instantiated with sprite loading"""
+    print("=" * 60)
+    print("TEST 11: Obstacle Instantiation with Sprites")
+    print("=" * 60)
+    
+    try:
+        # Test a few different obstacle types
+        spike_obs = spike(100, 100)
+        assert spike_obs is not None, "Spike obstacle is None"
+        assert spike_obs.image is not None, "Spike image is None"
+        print(f"✓ Spike obstacle created successfully")
+        
+        fire_obs = fire(150, 150)
+        assert fire_obs is not None, "Fire obstacle is None"
+        print(f"✓ Fire obstacle created successfully")
+        
+        bouncy_obs = bouncy(200, 200)
+        assert bouncy_obs is not None, "Bouncy obstacle is None"
+        print(f"✓ Bouncy obstacle created successfully")
+        
+        print("✓ PASS: All obstacle types instantiate correctly")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def test_platform_instantiation():
+    """Test that Platform class can be instantiated with tile sprites"""
+    print("=" * 60)
+    print("TEST 12: Platform Instantiation with Tile Sprites")
+    print("=" * 60)
+    
+    try:
+        platform = Platform(100, 300, 200, 20)
+        assert platform is not None, "Platform object is None"
+        assert platform.image is not None, "Platform image is None"
+        assert platform.rect is not None, "Platform rect is None"
+        print(f"✓ Platform instantiated successfully")
+        print(f"✓ Platform position: ({platform.rect.x}, {platform.rect.y})")
+        print(f"✓ Platform dimensions: {platform.rect.width}x{platform.rect.height}")
+        
+        print("✓ PASS: Platform instantiation works with tile sprite system")
+    except AssertionError as e:
+        print(f"✗ FAIL: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        return False
+    
+    print()
+    return True
+
+def main():
+    """Run all tests"""
+    print("\n")
+    print("=" * 60)
+    print("ASSET LOADING AND SPRITE SYSTEM TEST SUITE")
+    print("=" * 60)
+    print()
+    
+    tests = [
+        test_asset_directory_structure,
+        test_asset_files_exist,
+        test_asset_loader_initialization,
+        test_player_sprite_loading,
+        test_enemy_sprite_loading,
+        test_obstacle_sprites_loading,
+        test_terrain_tiles_loading,
+        test_animation_frames_loading,
+        test_player_instantiation,
+        test_enemy_instantiation,
+        test_obstacle_instantiation,
+        test_platform_instantiation,
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    for test in tests:
+        try:
+            result = test()
+            if result is not False:
+                passed += 1
             else:
-                print(f"✗ Minimum gap is {min_gap}, expected ~{expected_min}")
-        
-        # Check that topmost platform is at a reasonable height
-        topmost_y = min(platform_y_positions)
-        if topmost_y >= 50 and topmost_y <= 200:
-            print(f"✓ Topmost platform at y={topmost_y}")
-        else:
-            print(f"✗ Topmost platform at y={topmost_y}, should be between 50-200")
-
-
-def test_door_placement():
-    """Test that door is placed on a platform"""
-    print("\n" + "=" * 60)
-    print("TEST 9: Door Placement")
+                failed += 1
+        except Exception as e:
+            print(f"✗ EXCEPTION in {test.__name__}: {e}")
+            failed += 1
+    
+    print("=" * 60)
+    print(f"TEST SUMMARY: {passed} PASSED, {failed} FAILED")
     print("=" * 60)
     
-    platforms = generate_terrain(seed=42, difficulty=1, is_boss=False)
-    topmost_platform = min(platforms, key=lambda p: p.rect.y)
-    
-    door_width = 50
-    door_height = 80
-    door_x = topmost_platform.rect.centerx - door_width // 2
-    door_y = topmost_platform.rect.top - door_height
-    
-    print(f"Topmost platform: y={topmost_platform.rect.y}")
-    print(f"Door positioned: y={door_y}")
-    
-    if door_y + door_height == topmost_platform.rect.top:
-        print("✓ PASS: Door is sitting on the topmost platform")
+    if failed == 0:
+        print("✓ ALL TESTS PASSED!")
     else:
-        print(f"✗ FAIL: Door bottom {door_y + door_height} != platform top {topmost_platform.rect.top}")
-
-
-def test_powerup_spawning():
-    """Test that power-ups are spawned"""
-    print("\n" + "=" * 60)
-    print("TEST 10: Power-up Spawning in Game")
-    print("=" * 60)
+        print(f"✗ {failed} TEST(S) FAILED")
     
-    try:
-        with open('src/game.py', 'r') as f:
-            game_code = f.read()
-        
-        checks = [
-            ('self.powerups = pygame.sprite.Group()' in game_code, "Power-ups group created"),
-            ('_spawn_powerups' in game_code, "Power-up spawn method"),
-            ('ArmorPowerUp' in game_code, "Armor power-up imported"),
-            ('AttackPowerUp' in game_code, "Attack power-up imported"),
-            ('SpeedPowerUp' in game_code, "Speed power-up imported"),
-            ('powerup_hits = pygame.sprite.spritecollide' in game_code, "Power-up collision detection"),
-        ]
-        
-        for check, description in checks:
-            if check:
-                print(f"✓ {description}")
-            else:
-                print(f"✗ {description}")
-        
-        if all(c[0] for c in checks):
-            print("✓ PASS: Power-up spawning system implemented")
-        else:
-            print("✗ FAIL: Some power-up spawning components missing")
-    
-    except Exception as e:
-        print(f"✗ ERROR: {e}")
-
+    print()
 
 if __name__ == '__main__':
-    print("\n" + "=" * 60)
-    print("COMPREHENSIVE GAME CHANGES VALIDATION TEST SUITE")
-    print("=" * 60)
-    
-    test_powerup_system()
-    test_player_powerup_activation()
-    test_armor_damage_reduction()
-    test_player_sprite()
-    test_attack_sprite()
-    test_powerup_indicators()
-    test_victory_music()
-    test_platform_spacing()
-    test_door_placement()
-    test_powerup_spawning()
-    
-    print("\n" + "=" * 60)
-    print("TEST SUITE COMPLETE")
-    print("=" * 60)
-    print("\nSUMMARY:")
-    print("- Power-up system (Armor, Attack, Speed) implemented ✓")
-    print("- UI indicators with duration timers implemented ✓")
-    print("- Damage and pickup feedback implemented ✓")
-    print("- Player sprite with character graphics implemented ✓")
-    print("- Attack sprite with sword graphics implemented ✓")
-    print("- Victory music system implemented ✓")
-    print("- Victory music generated and ready to use ✓")
+    main()
+

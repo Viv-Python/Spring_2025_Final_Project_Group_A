@@ -1,5 +1,6 @@
 import pygame
 from settings import BLUE, PLAYER_WIDTH, PLAYER_HEIGHT, GRAVITY, WIDTH, HEIGHT
+from asset_loader import get_loader
 
 class Attack(pygame.sprite.Sprite):
     """Represents the player's attack hitbox"""
@@ -28,14 +29,24 @@ class Player(pygame.sprite.Sprite):
         super().__init__()
         self.width = PLAYER_WIDTH
         self.height = PLAYER_HEIGHT
-        self.image = pygame.Surface((self.width, self.height))
-        # Draw a character sprite
-        self.image.fill(BLUE)
-        # Draw a simple character face and body
-        pygame.draw.circle(self.image, (255, 200, 150), (self.width // 2, 12), 8)  # Head
-        pygame.draw.line(self.image, (255, 200, 150), (self.width // 2, 20), (self.width // 2, 40), 3)  # Body
-        pygame.draw.circle(self.image, (50, 50, 100), (self.width // 2 - 4, 12), 2)  # Left eye
-        pygame.draw.circle(self.image, (50, 50, 100), (self.width // 2 + 4, 12), 2)  # Right eye
+        
+        # Try to load player sprite from assets
+        loader = get_loader()
+        player_sprite = loader.get_player_idle()
+        if player_sprite is not None:
+            # Scale sprite to match player dimensions
+            self.image = pygame.transform.scale(player_sprite, (self.width, self.height))
+            print(f"✓ Player sprite loaded successfully ({self.width}x{self.height})")
+        else:
+            # Fallback: draw a character sprite
+            self.image = pygame.Surface((self.width, self.height))
+            self.image.fill(BLUE)
+            # Draw a simple character face and body
+            pygame.draw.circle(self.image, (255, 200, 150), (self.width // 2, 12), 8)  # Head
+            pygame.draw.line(self.image, (255, 200, 150), (self.width // 2, 20), (self.width // 2, 40), 3)  # Body
+            pygame.draw.circle(self.image, (50, 50, 100), (self.width // 2 - 4, 12), 2)  # Left eye
+            pygame.draw.circle(self.image, (50, 50, 100), (self.width // 2 + 4, 12), 2)  # Right eye
+            print("⚠ Player sprite not found, using fallback")
         
         self.rect = self.image.get_rect(topleft=(x, y))
         self.vel_x = 0
@@ -61,6 +72,11 @@ class Player(pygame.sprite.Sprite):
         # Feedback timers
         self.damage_taken_timer = 0
         self.pickup_collected_timer = 0
+        
+        # Animation attributes
+        self.walking_animation = loader.get_player_walking()
+        self.animation_frame = 0
+        self.animation_counter = 0
 
     def handle_input(self):
         keys = pygame.key.get_pressed()
