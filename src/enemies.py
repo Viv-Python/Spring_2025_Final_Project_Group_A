@@ -21,6 +21,10 @@ class Projectile(pygame.sprite.Sprite):
 
 
 class Enemy(pygame.sprite.Sprite):
+    # Class variable to track how many enemies are currently attacking
+    currently_attacking = 0
+    max_attacking = 2  # Maximum 2 enemies can attack at a time
+    
     def __init__(self, x, y, pattern='patrol', bounds=None, speed=2, health=45, melee_damage=10, ranged=False, color=RED):
         super().__init__()
         
@@ -57,6 +61,7 @@ class Enemy(pygame.sprite.Sprite):
         # Hopping behavior
         self.hop_cooldown = 0
         self.hop_pattern = pattern in ['patrol', 'sine']  # Some enemies hop
+        self.is_attacking = False  # Track if this enemy is currently attacking
 
     def apply_gravity(self):
         self.vy += GRAVITY

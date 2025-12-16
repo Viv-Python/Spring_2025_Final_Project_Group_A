@@ -212,12 +212,19 @@ class Game:
                 elif self.game_state == GAME_STATE_LEVEL_COMPLETE:
                     if event.key == pygame.K_SPACE:
                         # Advance to next level
-                        if self.level >= NUM_REGULAR_LEVELS:
+                        if self.level >= BOSS_LEVEL:
+                            # Game complete! Transition to game over (victory screen)
+                            self.game_state = GAME_STATE_GAMEOVER
+                        elif self.level >= NUM_REGULAR_LEVELS:
+                            # Move to boss level
                             self.level = BOSS_LEVEL
+                            self.init_level()
+                            self.game_state = GAME_STATE_PLAYING
                         else:
+                            # Advance to next regular level
                             self.level += 1
-                        self.init_level()
-                        self.game_state = GAME_STATE_PLAYING
+                            self.init_level()
+                            self.game_state = GAME_STATE_PLAYING
         return True
 
     def update(self):
@@ -241,11 +248,14 @@ class Game:
         
         self.projectiles.update()
         
-        # Player attacks hitting enemies
+        # Player attacks hitting enemies (prevent multiple hits from one swipe)
         for attack in self.player.attacks:
             hits = pygame.sprite.spritecollide(attack, self.enemies, False)
             for enemy in hits:
-                enemy.take_damage(attack.damage)
+                # Only damage enemy once per attack swipe
+                if enemy not in attack.hit_enemies:
+                    enemy.take_damage(attack.damage)
+                    attack.hit_enemies.add(enemy)
         
         # Player attacks hitting obstacles
         for attack in self.player.attacks:
@@ -254,10 +264,19 @@ class Game:
                 if obstacle.take_damage(attack.damage):
                     pass  # Obstacle was destroyed
         
-        # Enemy melee contact with player
+        # Reset attacking counter for this frame
+        Enemy.currently_attacking = 0
+        
+        # Enemy melee contact with player (limit to max 2 attacking)
         hits = pygame.sprite.spritecollide(self.player, self.enemies, False)
         for enemy in hits:
-            self.player.take_damage(enemy.melee_damage)
+            # Check if we can attack (max 2 enemies attacking at once)
+            if Enemy.currently_attacking < Enemy.max_attacking:
+                self.player.take_damage(enemy.melee_damage)
+                Enemy.currently_attacking += 1
+                enemy.is_attacking = True
+            else:
+                enemy.is_attacking = False
         
         # Projectiles hitting player
         proj_hits = pygame.sprite.spritecollide(self.player, self.projectiles, True)
@@ -349,6 +368,9 @@ class Game:
         # The background scrolls slower than foreground elements
         self._draw_parallax_background()
         
+        # Draw underground/ground area (below level)
+        self._draw_underground()
+        
         # Draw game objects with camera offset applied
         # Platforms
         for platform in self.platforms:
@@ -415,6 +437,108 @@ class Game:
         
         # Draw UI (not affected by camera, stays on screen)
         self._draw_ui()
+    
+    def _draw_underground(self):
+        """
+        Draw underground area below the playable level.
+        This includes colored ground and dinosaur skeletons.
+        """
+        camera_y = self.camera.y
+        ground_y = LEVEL_HEIGHT
+        
+        # Define ground color based on level
+        if self.level == 1:
+            ground_color = (139, 69, 19)       # Brown
+            skeleton_color = (200, 200, 200)   # Light gray for bones
+        elif self.level == 2:
+            ground_color = (100, 50, 150)      # Purple
+            skeleton_color = (180, 150, 200)   # Light purple
+        elif self.level == 3:
+            ground_color = (150, 50, 50)       # Dark red
+            skeleton_color = (220, 200, 150)   # Beige for bones
+        elif self.level == BOSS_LEVEL:
+            ground_color = (20, 20, 40)        # Dark blue/black
+            skeleton_color = (150, 150, 150)   # Gray for bones
+        else:
+            ground_color = (100, 80, 60)       # Default brown
+            skeleton_color = (200, 200, 200)   # Default light gray
+        
+        # Draw ground/underground area
+        screen_ground_y = (ground_y - camera_y)
+        if screen_ground_y < HEIGHT:  # Only draw if visible
+            # Draw colored underground rectangle
+            pygame.draw.rect(self.screen, ground_color, 
+                           (0, max(0, screen_ground_y), WIDTH, HEIGHT - max(0, screen_ground_y)))
+            
+            # Draw some dinosaur skeletons in the underground
+            num_skeletons = 5
+            for i in range(num_skeletons):
+                # Calculate skeleton positions based on level
+                skeleton_x = (100 + i * 150 + (self.seed * i) % 100) % WIDTH
+                skeleton_y = screen_ground_y + 30 + (i % 3) * 80
+                if skeleton_y < HEIGHT:
+                    self._draw_dinosaur_skeleton(skeleton_x, skeleton_y, skeleton_color)
+    
+    def _draw_dinosaur_skeleton(self, x, y, color):
+        """
+        Draw a simple ASCII-style dinosaur skeleton in the game world.
+        Uses simple geometric shapes to represent bones.
+        """
+        # T-Rex style skeleton - simplified
+        bone_width = 3
+        
+        # Skull (circle)
+        pygame.draw.circle(self.screen, color, (int(x), int(y)), 15)
+        # Jaw line
+        pygame.draw.line(self.screen, color, (int(x - 10), int(y + 5)), (int(x + 10), int(y + 5)), bone_width)
+        
+        # Spine/Vertebrae (vertical line with dots)
+        spine_start_y = y + 15
+        spine_end_y = y + 80
+        pygame.draw.line(self.screen, color, (int(x), int(spine_start_y)), (int(x), int(spine_end_y)), bone_width)
+        
+        # Draw vertebrae as small circles
+        for vert_y in range(int(spine_start_y), int(spine_end_y), 15):
+            pygame.draw.circle(self.screen, color, (int(x), vert_y), 4)
+        
+        # Ribcage (curved lines)
+        for rib_i in range(4):
+            rib_y = spine_start_y + 15 + rib_i * 15
+            rib_left = x - 20
+            rib_right = x + 20
+            # Left ribs
+            pygame.draw.line(self.screen, color, (int(x), int(rib_y)), (int(rib_left), int(rib_y)), bone_width)
+            # Right ribs
+            pygame.draw.line(self.screen, color, (int(x), int(rib_y)), (int(rib_right), int(rib_y)), bone_width)
+        
+        # Tail (curved line going back and down)
+        tail_start = spine_end_y
+        tail_segments = 6
+        tail_x = x
+        tail_y = y + 80
+        for seg in range(tail_segments):
+            next_tail_x = tail_x + 15 * (1 if seg % 2 == 0 else -1)
+            next_tail_y = tail_y + 20
+            pygame.draw.line(self.screen, color, (int(tail_x), int(tail_y)), (int(next_tail_x), int(next_tail_y)), bone_width)
+            tail_x = next_tail_x
+            tail_y = next_tail_y
+        
+        # Front legs (two pairs)
+        # Front left leg
+        pygame.draw.line(self.screen, color, (int(x - 15), int(y + 50)), (int(x - 25), int(y + 100)), bone_width)
+        # Front right leg
+        pygame.draw.line(self.screen, color, (int(x + 15), int(y + 50)), (int(x + 25), int(y + 100)), bone_width)
+        
+        # Back legs (larger)
+        # Back left leg
+        pygame.draw.line(self.screen, color, (int(x - 20), int(y + 70)), (int(x - 30), int(y + 120)), bone_width)
+        # Back right leg
+        pygame.draw.line(self.screen, color, (int(x + 20), int(y + 70)), (int(x + 30), int(y + 120)), bone_width)
+        
+        # Foot bones (small circles at leg ends)
+        foot_positions = [(x - 25, y + 100), (x + 25, y + 100), (x - 30, y + 120), (x + 30, y + 120)]
+        for foot_x, foot_y in foot_positions:
+            pygame.draw.circle(self.screen, color, (int(foot_x), int(foot_y)), 5)
     
     def _draw_parallax_background(self):
         """
@@ -584,11 +708,16 @@ class Game:
         self.screen.fill(WHITE)
         
         complete_text = self.font.render("LEVEL COMPLETE", True, (0, 150, 0))
-        next_text = self.small_font.render(f"Level {self.level + 1} Ready", True, BLACK)
+        
+        if self.level >= BOSS_LEVEL:
+            next_text = self.small_font.render("BOSS DEFEATED! YOU WIN!", True, (0, 100, 0))
+        else:
+            next_text = self.small_font.render(f"Level {self.level + 1} Ready", True, BLACK)
+        
         continue_text = self.small_font.render("Press SPACE to Continue", True, BLACK)
         
         self.screen.blit(complete_text, (WIDTH // 2 - 150, HEIGHT // 2 - 100))
-        self.screen.blit(next_text, (WIDTH // 2 - 100, HEIGHT // 2 - 20))
+        self.screen.blit(next_text, (WIDTH // 2 - 150, HEIGHT // 2 - 20))
         self.screen.blit(continue_text, (WIDTH // 2 - 140, HEIGHT // 2 + 60))
 
     def run(self):

@@ -2,7 +2,8 @@ import pygame
 import random
 import os
 from enemies import Enemy
-from settings import PURPLE, ENEMY_SIZE, GRAVITY, WIDTH, HEIGHT, YELLOW, GREEN, BLACK
+from settings import PURPLE, ENEMY_SIZE, GRAVITY, WIDTH, HEIGHT, YELLOW, GREEN, BLACK, ORANGE, RED
+from asset_loader import get_loader
 
 class Boss(pygame.sprite.Sprite):
     """Boss enemy with distinct behavior and higher difficulty"""
@@ -22,6 +23,7 @@ class Boss(pygame.sprite.Sprite):
                 (40, 40), (20, 40)
             ])
         self.rect = self.image.get_rect(topleft=(x, y))
+        self.base_image = self.image.copy()  # Store original for color changes
         self.speed = 1.5
         self.health = 150
         self.max_health = 150
@@ -38,23 +40,13 @@ class Boss(pygame.sprite.Sprite):
         self.bounds = (50, WIDTH - 50)
 
     def _load_bear_asset(self):
-        """Load the scary bear asset from disk"""
-        bear_paths = [
-            'assets/enemies/scary_bear.png',
-            '../assets/enemies/scary_bear.png',
-            'src/../assets/enemies/scary_bear.png',
-        ]
+        """Load the scary bear asset from disk using the asset loader"""
+        loader = get_loader()
+        bear_image = loader.load_sprite('enemies/scary_bear.png')
         
-        for path in bear_paths:
-            if os.path.exists(path):
-                try:
-                    bear_image = pygame.image.load(path)
-                    # Convert to ensure compatibility
-                    bear_image = bear_image.convert_alpha()
-                    return bear_image
-                except Exception as e:
-                    print(f"Failed to load bear asset from {path}: {e}")
-                    continue
+        if bear_image is not None:
+            print(f"[+] Bear asset loaded successfully")
+            return bear_image
         
         print("Bear asset not found, using fallback purple square")
         return None
@@ -63,6 +55,36 @@ class Boss(pygame.sprite.Sprite):
         self.vy += GRAVITY
         if self.vy > 10:
             self.vy = 10
+
+    def update_phase_color(self):
+        """Update boss color based on health phase"""
+        # Only update if we have a base image (fallback case)
+        if hasattr(self, 'base_image') and self.base_image is not None:
+            # Create a copy to avoid modifying the original
+            self.image = self.base_image.copy()
+            
+            if self.phase == 1:
+                # Phase 1: Purple (normal)
+                color = PURPLE
+            elif self.phase == 2:
+                # Phase 2: Orange (moderate damage)
+                color = ORANGE
+            else:  # phase 3
+                # Phase 3: Red (critical damage)
+                color = RED
+            
+            # Fill the image with the new color (only if it's the fallback surface)
+            if isinstance(self.base_image, pygame.Surface):
+                self.image.fill(color)
+                # Redraw crown with contrasting color
+                if color == RED:
+                    crown_color = YELLOW
+                else:
+                    crown_color = (255, 215, 0)
+                pygame.draw.polygon(self.image, crown_color, [
+                    (20, 20), (25, 10), (30, 20), (35, 10), (40, 20),
+                    (40, 40), (20, 40)
+                ])
 
     def draw_health_bar(self, surface, camera=None):
         """
@@ -101,6 +123,9 @@ class Boss(pygame.sprite.Sprite):
         if self.health < self.max_health * 0.25:
             self.phase = 3
         
+        # Update boss color based on current phase
+        self.update_phase_color()
+        
         self.phase_timer += 1
         
         # Boss movement pattern
@@ -125,11 +150,18 @@ class Boss(pygame.sprite.Sprite):
                 self.rect.right = self.bounds[1]
                 self.vy = -12  # Jump
         else:  # phase 3
-            # Aggressive zigzag pattern
-            offset = int((self.phase_timer % 20) * 2 - 20)
-            self.rect.x = player.rect.centerx - ENEMY_SIZE + offset
-            if self.phase_timer % 10 == 0:
-                self.vy = -10  # Frequent jumps
+            # Aggressive zigzag pattern - constrain to bounds (reduced movement range)
+            # FIXED: Keep boss lower so player can reach it
+            offset = int((self.phase_timer % 20) * 1 - 10)  # Reduced zigzag amplitude
+            target_x = max(self.bounds[0], min(player.rect.centerx - ENEMY_SIZE + offset, self.bounds[1] - ENEMY_SIZE * 2))
+            self.rect.x = target_x
+            # Enforce bounds to prevent flying off screen
+            if self.rect.left < self.bounds[0]:
+                self.rect.left = self.bounds[0]
+            elif self.rect.right > self.bounds[1]:
+                self.rect.right = self.bounds[1]
+            if self.phase_timer % 15 == 0:
+                self.vy = -5  # Reduced jump height - was -10, now -5 for lower flight
 
         # Gravity and platform collision
         self.apply_gravity()
@@ -140,10 +172,19 @@ class Boss(pygame.sprite.Sprite):
                     self.rect.bottom = p.rect.top
                     self.vy = 0
 
-        # Prevent falling off screen
+        # Prevent falling off screen (both bottom and top)
         if self.rect.bottom > HEIGHT:
             self.rect.bottom = HEIGHT
             self.vy = 0
+        if self.rect.top < 0:
+            self.rect.top = 0
+            self.vy = 0
+        
+        # Extra safety: ensure boss never leaves horizontal bounds
+        if self.rect.left < self.bounds[0]:
+            self.rect.left = self.bounds[0]
+        if self.rect.right > self.bounds[1]:
+            self.rect.right = self.bounds[1]
 
         # Boss ranged attack with patterns
         if projectiles_group is not None:

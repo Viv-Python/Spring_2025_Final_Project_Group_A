@@ -9,7 +9,12 @@ class Attack(pygame.sprite.Sprite):
         
         # Try to load sword attack sprite from assets
         loader = get_loader()
-        sword_sprite = loader.get_sword_swing()
+        
+        # Load appropriate sword animation based on direction
+        if direction == 1:  # Right swing
+            sword_sprite = loader.get_sword_swing()
+        else:  # Left swing
+            sword_sprite = loader.get_sword_swing_left()
         
         if sword_sprite is not None and len(sword_sprite) > 0:
             # Use the first frame of sword animation
@@ -17,7 +22,8 @@ class Attack(pygame.sprite.Sprite):
             self.animation_frames = [pygame.transform.scale(frame, (width, height)) for frame in sword_sprite]
             self.animation_frame = 0
             self.animation_counter = 0
-            print(f"✓ Sword attack animation loaded ({len(self.animation_frames)} frames)")
+            sword_type = "right" if direction == 1 else "left"
+            print(f"✓ Sword attack animation loaded ({sword_type} swing, {len(self.animation_frames)} frames)")
         else:
             # Fallback: draw a sword-like shape
             self.image = pygame.Surface((width, height))
@@ -28,12 +34,17 @@ class Attack(pygame.sprite.Sprite):
             ])
             self.animation_frames = None
             print("⚠ Sword animation not found, using fallback")
+            
+            # Only flip the fallback sword if swinging left
+            if direction == -1:
+                self.image = pygame.transform.flip(self.image, True, False)
         
         self.image.set_alpha(180)  # Semi-transparent
         self.rect = self.image.get_rect(topleft=(x, y))
         self.damage = damage
         self.direction = direction
         self.lifetime = 10  # frames
+        self.hit_enemies = set()  # Track enemies already hit by this attack to prevent multiple hits
 
     def update(self, *args):
         self.lifetime -= 1
@@ -101,8 +112,10 @@ class Player(pygame.sprite.Sprite):
         
         # Animation attributes
         self.walking_animation = loader.get_player_walking()
+        self.running_animation = loader.get_player_running()
         self.animation_frame = 0
         self.animation_counter = 0
+        self.is_running = False
 
     def handle_input(self):
         keys = pygame.key.get_pressed()
@@ -128,15 +141,15 @@ class Player(pygame.sprite.Sprite):
     def attack(self):
         """Create an attack hitbox"""
         if self.attack_cooldown <= 0:
-            attack_width = 70  # Increased reach
+            attack_width = 50  # Reduced reach, brought closer to player
             attack_height = 50
             # Apply attack damage modifier from power-ups
             base_damage = 15
             final_damage = int(base_damage * self.attack_mod)
             if self.facing_right:
-                attack_x = self.rect.right
+                attack_x = self.rect.right - 20  # Brought closer to player
             else:
-                attack_x = self.rect.left - attack_width
+                attack_x = self.rect.left - attack_width + 20  # Brought closer to player
             
             attack = Attack(attack_x, self.rect.centery - attack_height // 2, 
                           attack_width, attack_height, 
@@ -151,6 +164,29 @@ class Player(pygame.sprite.Sprite):
 
     def update(self, platforms):
         self.handle_input()
+        
+        # Determine if player is running (moving)
+        self.is_running = self.vel_x != 0
+        
+        # Apply running animation
+        if self.is_running and self.running_animation is not None:
+            self.animation_counter += 1
+            if self.animation_counter >= 5:  # Change frame every 5 updates
+                self.animation_counter = 0
+                self.animation_frame = (self.animation_frame + 1) % len(self.running_animation)
+            self.image = self.running_animation[self.animation_frame]
+            if not self.facing_right:
+                self.image = pygame.transform.flip(self.image, True, False)
+        else:
+            # Show idle sprite when not moving
+            loader = get_loader()
+            idle_sprite = loader.get_player_idle()
+            if idle_sprite is not None:
+                self.image = pygame.transform.scale(idle_sprite, (self.width, self.height))
+                if not self.facing_right:
+                    self.image = pygame.transform.flip(self.image, True, False)
+            self.animation_frame = 0
+            self.animation_counter = 0
         
         # update temporary modifiers
         if self.speed_mod_timer > 0:
@@ -239,8 +275,8 @@ class Player(pygame.sprite.Sprite):
         
         self.health -= actual_damage
         print(f"Player took {actual_damage} damage (armor: {self.armor_active}); health={self.health}")
-        self.invuln_timer = 30
-        self.damage_taken_timer = 30  # Show damage feedback for 30 frames
+        self.invuln_timer = 60  # Increased from 30 to 60 frames for better protection
+        self.damage_taken_timer = 60  # Show damage feedback for 60 frames
         
         if self.health <= 0:
             print("Player died")

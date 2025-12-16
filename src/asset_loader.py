@@ -18,8 +18,14 @@ class AssetLoader:
     
     def _check_assets(self) -> bool:
         """Check if assets directory and key files exist"""
+        # Adjust asset_dir path if running from src/ subdirectory
         if not os.path.exists(self.asset_dir):
-            return False
+            # Try parent directory
+            alternate_path = os.path.join('..', self.asset_dir)
+            if os.path.exists(alternate_path):
+                self.asset_dir = alternate_path
+            else:
+                return False
         
         key_assets = [
             'player/player_idle.png',
@@ -120,6 +126,10 @@ class AssetLoader:
         """Get player walking animation frames"""
         return self.load_animation('animations/player_walk', 4)
     
+    def get_player_running(self) -> Optional[list]:
+        """Get player running animation frames"""
+        return self.load_animation('animations/player_run', 4)
+    
     def get_enemy_sprite(self, enemy_type: str = 'forest_creature') -> Optional[pygame.Surface]:
         """Get enemy sprite"""
         return self.load_sprite(f'enemies/{enemy_type}.png')
@@ -131,6 +141,10 @@ class AssetLoader:
     def get_sword_swing(self) -> Optional[list]:
         """Get sword swing attack animation frames"""
         return self.load_animation('animations/sword_swing', 4)
+    
+    def get_sword_swing_left(self) -> Optional[list]:
+        """Get sword swing left attack animation frames"""
+        return self.load_animation('animations/sword_swing_left', 4)
     
     def get_obstacle_sprite(self, obstacle_type: str) -> Optional[pygame.Surface]:
         """Get obstacle sprite by type"""
