@@ -46,8 +46,8 @@ def generate_terrain(seed=None, difficulty=1, is_boss=False):
         min_platform_width = 100 + (difficulty * 20)
         max_platform_width = 200 + (difficulty * 30)
         
-        # Start the first platform closer to the ground to maintain consistent spacing
-        y = HEIGHT - 40 - random.randint(min_gap, max_gap)
+        # Start the first platform closer to the ground (just above it with smaller gap)
+        y = HEIGHT - 40 - random.randint(80, 120)  # Smaller gap to start closer to ground
         x = random.randint(50, WIDTH - 150)
         
         # Generate platforms with consistent spacing all the way to near the top

@@ -1,5 +1,6 @@
 import pygame
 import random
+import os
 from enemies import Enemy
 from settings import PURPLE, ENEMY_SIZE, GRAVITY, WIDTH, HEIGHT, YELLOW, GREEN, BLACK
 
@@ -7,17 +8,23 @@ class Boss(pygame.sprite.Sprite):
     """Boss enemy with distinct behavior and higher difficulty"""
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((ENEMY_SIZE * 2, ENEMY_SIZE * 2))
-        self.image.fill(PURPLE)
-        # Draw a crown-like pattern
-        pygame.draw.polygon(self.image, (255, 215, 0), [
-            (20, 20), (25, 10), (30, 20), (35, 10), (40, 20),
-            (40, 40), (20, 40)
-        ])
+        # Try to load the scary bear asset
+        bear_image = self._load_bear_asset()
+        if bear_image is not None:
+            self.image = bear_image
+        else:
+            # Fallback: create a purple square with crown if asset not found
+            self.image = pygame.Surface((ENEMY_SIZE * 2, ENEMY_SIZE * 2))
+            self.image.fill(PURPLE)
+            # Draw a crown-like pattern
+            pygame.draw.polygon(self.image, (255, 215, 0), [
+                (20, 20), (25, 10), (30, 20), (35, 10), (40, 20),
+                (40, 40), (20, 40)
+            ])
         self.rect = self.image.get_rect(topleft=(x, y))
         self.speed = 1.5
-        self.health = 100
-        self.max_health = 100
+        self.health = 150
+        self.max_health = 150
         self.pattern = 'boss_pattern'
         self.vx = self.speed
         self.vy = 0
@@ -29,6 +36,28 @@ class Boss(pygame.sprite.Sprite):
         self.attack_pattern = 0
         self.hitbox = self.rect.copy()
         self.bounds = (50, WIDTH - 50)
+
+    def _load_bear_asset(self):
+        """Load the scary bear asset from disk"""
+        bear_paths = [
+            'assets/enemies/scary_bear.png',
+            '../assets/enemies/scary_bear.png',
+            'src/../assets/enemies/scary_bear.png',
+        ]
+        
+        for path in bear_paths:
+            if os.path.exists(path):
+                try:
+                    bear_image = pygame.image.load(path)
+                    # Convert to ensure compatibility
+                    bear_image = bear_image.convert_alpha()
+                    return bear_image
+                except Exception as e:
+                    print(f"Failed to load bear asset from {path}: {e}")
+                    continue
+        
+        print("Bear asset not found, using fallback purple square")
+        return None
 
     def apply_gravity(self):
         self.vy += GRAVITY

@@ -128,6 +128,10 @@ class AssetLoader:
         """Get enemy idle animation frames"""
         return self.load_animation('animations/enemy_idle', 4)
     
+    def get_sword_swing(self) -> Optional[list]:
+        """Get sword swing attack animation frames"""
+        return self.load_animation('animations/sword_swing', 4)
+    
     def get_obstacle_sprite(self, obstacle_type: str) -> Optional[pygame.Surface]:
         """Get obstacle sprite by type"""
         return self.load_sprite(f'obstacles/{obstacle_type}.png')

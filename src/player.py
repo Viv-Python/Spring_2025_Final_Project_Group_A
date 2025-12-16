@@ -6,13 +6,29 @@ class Attack(pygame.sprite.Sprite):
     """Represents the player's attack hitbox"""
     def __init__(self, x, y, width=70, height=50, direction=1, damage=15):
         super().__init__()
-        self.image = pygame.Surface((width, height))
-        # Draw a sword-like shape
-        self.image.fill((100, 100, 100))
-        pygame.draw.polygon(self.image, (200, 200, 100), [
-            (width // 2 - 5, 5), (width // 2 + 5, 5), 
-            (width // 2 + 3, height - 5), (width // 2 - 3, height - 5)
-        ])
+        
+        # Try to load sword attack sprite from assets
+        loader = get_loader()
+        sword_sprite = loader.get_sword_swing()
+        
+        if sword_sprite is not None and len(sword_sprite) > 0:
+            # Use the first frame of sword animation
+            self.image = pygame.transform.scale(sword_sprite[0], (width, height))
+            self.animation_frames = [pygame.transform.scale(frame, (width, height)) for frame in sword_sprite]
+            self.animation_frame = 0
+            self.animation_counter = 0
+            print(f"✓ Sword attack animation loaded ({len(self.animation_frames)} frames)")
+        else:
+            # Fallback: draw a sword-like shape
+            self.image = pygame.Surface((width, height))
+            self.image.fill((100, 100, 100))
+            pygame.draw.polygon(self.image, (200, 200, 100), [
+                (width // 2 - 5, 5), (width // 2 + 5, 5), 
+                (width // 2 + 3, height - 5), (width // 2 - 3, height - 5)
+            ])
+            self.animation_frames = None
+            print("⚠ Sword animation not found, using fallback")
+        
         self.image.set_alpha(180)  # Semi-transparent
         self.rect = self.image.get_rect(topleft=(x, y))
         self.damage = damage
@@ -21,6 +37,16 @@ class Attack(pygame.sprite.Sprite):
 
     def update(self, *args):
         self.lifetime -= 1
+        
+        # Animate sword swing if animation frames are available
+        if self.animation_frames is not None and self.lifetime > 0:
+            self.animation_counter += 1
+            if self.animation_counter >= 3:  # Change frame every 3 updates
+                self.animation_counter = 0
+                self.animation_frame = (self.animation_frame + 1) % len(self.animation_frames)
+                self.image = self.animation_frames[self.animation_frame]
+                self.image.set_alpha(180)
+        
         if self.lifetime <= 0:
             self.kill()
 

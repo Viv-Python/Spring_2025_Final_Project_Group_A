@@ -21,7 +21,7 @@ class Projectile(pygame.sprite.Sprite):
 
 
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, x, y, pattern='patrol', bounds=None, speed=2, health=20, melee_damage=10, ranged=False, color=RED):
+    def __init__(self, x, y, pattern='patrol', bounds=None, speed=2, health=45, melee_damage=10, ranged=False, color=RED):
         super().__init__()
         
         # Try to load enemy sprite from assets
@@ -170,6 +170,16 @@ class Enemy(pygame.sprite.Sprite):
             self.rect.bottom = HEIGHT
             self.vy = 0
             on_platform = True
+        
+        # If on a platform, prevent walking off the platform edges
+        if on_platform and self.current_platform is not None:
+            # Keep enemy within platform bounds when on it
+            if self.rect.left < self.current_platform.rect.left:
+                self.rect.left = self.current_platform.rect.left
+                self.vx = abs(self.vx)  # Reverse direction
+            elif self.rect.right > self.current_platform.rect.right:
+                self.rect.right = self.current_platform.rect.right
+                self.vx = -abs(self.vx)  # Reverse direction
 
         # Update hitbox
         self.hitbox = self.rect.copy()

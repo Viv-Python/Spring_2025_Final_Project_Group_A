@@ -233,6 +233,71 @@ def create_player_walking_animation():
     
     print(f"✓ Player walking animation created: {ANIMATION_FRAMES} frames")
 
+def create_sword_attack_animation():
+    """Create 4-frame sword swing attack animation"""
+    for frame in range(ANIMATION_FRAMES):
+        img = Image.new('RGBA', (100, 60), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        # Calculate rotation angle based on frame (swing motion)
+        angle = (frame / ANIMATION_FRAMES) * 180 - 90  # Swing from -90 to 90 degrees
+        angle_rad = math.radians(angle)
+        
+        # Sword blade color (metallic gray-silver)
+        blade_color = (200, 200, 220)
+        blade_outline = (100, 100, 150)
+        
+        # Sword handle color (brown)
+        handle_color = (139, 69, 19)
+        handle_outline = (101, 50, 15)
+        
+        # Draw sword handle (fixed at center)
+        handle_x, handle_y = 50, 30
+        draw.rectangle([(handle_x - 3, handle_y - 8), (handle_x + 3, handle_y + 8)], 
+                       fill=handle_color, outline=handle_outline, width=1)
+        
+        # Draw sword guard (crossbar)
+        draw.rectangle([(handle_x - 12, handle_y - 2), (handle_x + 12, handle_y + 2)], 
+                       fill=(184, 134, 11), outline=(139, 100, 0), width=1)
+        
+        # Draw sword blade (rotated based on swing frame)
+        # Blade extends from handle
+        blade_length = 40
+        blade_width = 6
+        
+        # Calculate blade endpoint based on rotation
+        blade_end_x = handle_x + blade_length * math.cos(angle_rad)
+        blade_end_y = handle_y + blade_length * math.sin(angle_rad)
+        
+        # Create blade polygon (thick line with width)
+        # Perpendicular offset for blade width
+        perp_x = -math.sin(angle_rad) * (blade_width / 2)
+        perp_y = math.cos(angle_rad) * (blade_width / 2)
+        
+        blade_points = [
+            (handle_x + perp_x, handle_y + perp_y),
+            (blade_end_x + perp_x, blade_end_y + perp_y),
+            (blade_end_x - perp_x, blade_end_y - perp_y),
+            (handle_x - perp_x, handle_y - perp_y),
+        ]
+        draw.polygon(blade_points, fill=blade_color, outline=blade_outline)
+        
+        # Draw blade tip (pointed)
+        tip_points = [
+            (blade_end_x + perp_x * 0.5, blade_end_y + perp_y * 0.5),
+            (blade_end_x - perp_x * 0.5, blade_end_y - perp_y * 0.5),
+            (blade_end_x + math.cos(angle_rad) * 8, blade_end_y + math.sin(angle_rad) * 8),
+        ]
+        draw.polygon(tip_points, fill=(240, 240, 255), outline=blade_outline)
+        
+        # Draw pommel (handle end circle)
+        draw.ellipse([(handle_x - 5, handle_y + 8), (handle_x + 5, handle_y + 18)], 
+                     fill=(184, 134, 11), outline=(139, 100, 0), width=1)
+        
+        img.save(f'{ASSET_DIR}/animations/sword_swing_{frame}.png')
+    
+    print(f"✓ Sword swing attack animation created: {ANIMATION_FRAMES} frames")
+
 def create_enemy_idle_animation():
     """Create 4-frame idle animation for enemies (side view)"""
     for frame in range(ANIMATION_FRAMES):
@@ -291,6 +356,7 @@ def main():
     print("-" * 60)
     create_player_walking_animation()
     create_enemy_idle_animation()
+    create_sword_attack_animation()
     print()
     
     print("=" * 60)
