@@ -60,21 +60,24 @@ class Boss(pygame.sprite.Sprite):
         """Update boss color based on health phase"""
         # Only update if we have a base image (fallback case)
         if hasattr(self, 'base_image') and self.base_image is not None:
-            # Create a copy to avoid modifying the original
+            # For the bear image (not the fallback square), just keep it as-is
+            # The bear sprite will naturally look different as it doesn't need color changes
             self.image = self.base_image.copy()
             
-            if self.phase == 1:
-                # Phase 1: Purple (normal)
-                color = PURPLE
-            elif self.phase == 2:
-                # Phase 2: Orange (moderate damage)
-                color = ORANGE
-            else:  # phase 3
-                # Phase 3: Red (critical damage)
-                color = RED
-            
-            # Fill the image with the new color (only if it's the fallback surface)
-            if isinstance(self.base_image, pygame.Surface):
+            # Only color-modify the fallback square case (check if it's a drawn square, not the bear)
+            # We check if the image is the hand-drawn crown square by looking at its typical size
+            if self.base_image.get_size() == (ENEMY_SIZE * 2, ENEMY_SIZE * 2):
+                # This is the fallback square, apply color changes
+                if self.phase == 1:
+                    # Phase 1: Purple (normal)
+                    color = PURPLE
+                elif self.phase == 2:
+                    # Phase 2: Orange (moderate damage)
+                    color = ORANGE
+                else:  # phase 3
+                    # Phase 3: Red (critical damage)
+                    color = RED
+                
                 self.image.fill(color)
                 # Redraw crown with contrasting color
                 if color == RED:
