@@ -1,5 +1,6 @@
 import pygame
 import sys
+import os
 import random
 from settings import (WIDTH, HEIGHT, LEVEL_HEIGHT, WHITE, BLACK, FPS, GAME_STATE_PLAYING, 
                       GAME_STATE_GAMEOVER, GAME_STATE_LEVEL_COMPLETE, GAME_STATE_BOSS_STAGE,
@@ -48,12 +49,15 @@ class Game:
         self.victory_music_playing = False
         self.try_load_victory_music()
         
+        # Load level background
+        self.background_image = None
+        self.load_background()
+        
         # Initialize the level after setting up music
         self.init_level()
         
     def try_load_victory_music(self):
         """Try to load victory music from assets folder"""
-        import os
         try:
             # Look for music file in various locations
             possible_paths = [
@@ -77,8 +81,48 @@ class Game:
             self.victory_music_path = None
             return False
 
+    def load_background(self):
+        """Load level-specific background image"""
+        try:
+            # Determine which background to load based on level
+            if self.level == 1:
+                bg_name = 'swamp.png'
+            elif self.level == 2:
+                bg_name = 'jungle.png'
+            elif self.level == 3:
+                bg_name = 'forest.png'
+            elif self.level == BOSS_LEVEL:
+                bg_name = 'cave.png'
+            else:
+                bg_name = 'swamp.png'  # Default fallback
+            
+            # Try multiple paths to find the background
+            possible_paths = [
+                f'assets/backgrounds/{bg_name}',
+                f'src/assets/backgrounds/{bg_name}',
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    self.background_image = pygame.image.load(path).convert()
+                    # Scale to screen size
+                    self.background_image = pygame.transform.scale(self.background_image, (WIDTH, HEIGHT))
+                    print(f"[+] Background loaded for level {self.level}: {path}")
+                    return True
+            
+            print(f"[-] Background not found for level {self.level}, will use fallback colors")
+            self.background_image = None
+            return False
+        except Exception as e:
+            print(f"[-] Error loading background: {e}")
+            self.background_image = None
+            return False
+
     def init_level(self):
         """Initialize a new level with procedurally generated terrain and obstacles"""
+        # Load background for the new level
+        self.load_background()
+        
         # Player starts at the bottom of the level (in world coordinates), not screen coordinates
         self.player = Player(WIDTH // 2, LEVEL_HEIGHT - 120)
         self.platforms = pygame.sprite.Group()
@@ -211,17 +255,17 @@ class Game:
                         return False
                 elif self.game_state == GAME_STATE_LEVEL_COMPLETE:
                     if event.key == pygame.K_SPACE:
-                        # Advance to next level
-                        if self.level >= BOSS_LEVEL:
-                            # Game complete! Transition to game over (victory screen)
-                            self.game_state = GAME_STATE_GAMEOVER
+                        # Check if we just beat the boss (end game) or advance to next level
+                        if self.level == BOSS_LEVEL:
+                            # Boss defeated, restart the game from level 1
+                            self.__init__(level=1)
                         elif self.level >= NUM_REGULAR_LEVELS:
                             # Move to boss level
                             self.level = BOSS_LEVEL
                             self.init_level()
                             self.game_state = GAME_STATE_PLAYING
                         else:
-                            # Advance to next regular level
+                            # Move to next regular level
                             self.level += 1
                             self.init_level()
                             self.game_state = GAME_STATE_PLAYING
@@ -548,51 +592,67 @@ class Game:
         """
         camera_y = self.camera.y
         
-        # Define level-specific color schemes
-        if self.level == 1:
-            # Level 1: Forest/Green theme
-            far_color = (20, 40, 20)      # Dark green
-            mid_color = (40, 80, 40)      # Forest green
-            near_color = (60, 120, 60)    # Light green
-        elif self.level == 2:
-            # Level 2: Sky/Blue theme
-            far_color = (30, 50, 100)     # Deep blue
-            mid_color = (50, 100, 150)    # Sky blue
-            near_color = (100, 150, 200)  # Light blue
-        elif self.level == 3:
-            # Level 3: Lava/Orange theme
-            far_color = (60, 20, 10)      # Dark red
-            mid_color = (120, 40, 20)     # Lava orange
-            near_color = (180, 80, 40)    # Light orange
-        elif self.level == BOSS_LEVEL:
-            # Boss level: Dark/Purple theme
-            far_color = (40, 10, 60)      # Dark purple
-            mid_color = (80, 20, 120)     # Purple
-            near_color = (140, 50, 180)   # Light purple
+        # If we have a background image, display it with parallax effect
+        if self.background_image:
+            # Draw background with parallax scrolling (moves slower than foreground)
+            # Calculate parallax offset (slower movement than camera)
+            parallax_offset = int(camera_y * 0.3)  # Background moves at 30% of camera speed
+            
+            # Draw the background image in tiles to cover the full visible area
+            bg_y = -parallax_offset % HEIGHT
+            
+            # Draw the background image, tiling vertically for parallax effect
+            self.screen.blit(self.background_image, (0, bg_y - HEIGHT))
+            self.screen.blit(self.background_image, (0, bg_y))
+            if bg_y < 0:
+                self.screen.blit(self.background_image, (0, bg_y + HEIGHT))
         else:
-            # Default fallback
-            far_color = (80, 40, 100)
-            mid_color = (100, 50, 120)
-            near_color = (120, 70, 140)
-        
-        # Far background (moves slowly)
-        far_offset = int(camera_y * 0.2)
-        far_rect = pygame.Rect(0, -far_offset % HEIGHT, WIDTH, HEIGHT)
-        pygame.draw.rect(self.screen, far_color, (0, 0, WIDTH, HEIGHT))
-        
-        # Mid background (moves at medium speed)
-        mid_offset = int(camera_y * 0.5)
-        mid_y = (-mid_offset % HEIGHT)
-        pygame.draw.rect(self.screen, mid_color, (0, mid_y, WIDTH, HEIGHT))
-        if mid_y > 0:
-            pygame.draw.rect(self.screen, mid_color, (0, mid_y - HEIGHT, WIDTH, HEIGHT))
-        
-        # Near background (moves with most parallax effect)
-        near_offset = int(camera_y * 0.7)
-        near_y = (-near_offset % HEIGHT)
-        pygame.draw.rect(self.screen, near_color, (0, near_y, WIDTH, HEIGHT))
-        if near_y > 0:
-            pygame.draw.rect(self.screen, near_color, (0, near_y - HEIGHT, WIDTH, HEIGHT))
+            # Fallback to color-based background if image not loaded
+            # Define level-specific color schemes
+            if self.level == 1:
+                # Level 1: Forest/Green theme
+                far_color = (20, 40, 20)      # Dark green
+                mid_color = (40, 80, 40)      # Forest green
+                near_color = (60, 120, 60)    # Light green
+            elif self.level == 2:
+                # Level 2: Sky/Blue theme
+                far_color = (30, 50, 100)     # Deep blue
+                mid_color = (50, 100, 150)    # Sky blue
+                near_color = (100, 150, 200)  # Light blue
+            elif self.level == 3:
+                # Level 3: Lava/Orange theme
+                far_color = (60, 20, 10)      # Dark red
+                mid_color = (120, 40, 20)     # Lava orange
+                near_color = (180, 80, 40)    # Light orange
+            elif self.level == BOSS_LEVEL:
+                # Boss level: Dark/Purple theme
+                far_color = (40, 10, 60)      # Dark purple
+                mid_color = (80, 20, 120)     # Purple
+                near_color = (140, 50, 180)   # Light purple
+            else:
+                # Default fallback
+                far_color = (80, 40, 100)
+                mid_color = (100, 50, 120)
+                near_color = (120, 70, 140)
+            
+            # Far background (moves slowly)
+            far_offset = int(camera_y * 0.2)
+            far_rect = pygame.Rect(0, -far_offset % HEIGHT, WIDTH, HEIGHT)
+            pygame.draw.rect(self.screen, far_color, (0, 0, WIDTH, HEIGHT))
+            
+            # Mid background (moves at medium speed)
+            mid_offset = int(camera_y * 0.5)
+            mid_y = (-mid_offset % HEIGHT)
+            pygame.draw.rect(self.screen, mid_color, (0, mid_y, WIDTH, HEIGHT))
+            if mid_y > 0:
+                pygame.draw.rect(self.screen, mid_color, (0, mid_y - HEIGHT, WIDTH, HEIGHT))
+            
+            # Near background (moves with most parallax effect)
+            near_offset = int(camera_y * 0.7)
+            near_y = (-near_offset % HEIGHT)
+            pygame.draw.rect(self.screen, near_color, (0, near_y, WIDTH, HEIGHT))
+            if near_y > 0:
+                pygame.draw.rect(self.screen, near_color, (0, near_y - HEIGHT, WIDTH, HEIGHT))
     
     def _draw_ui(self):
         """
@@ -708,16 +768,11 @@ class Game:
         self.screen.fill(WHITE)
         
         complete_text = self.font.render("LEVEL COMPLETE", True, (0, 150, 0))
-        
-        if self.level >= BOSS_LEVEL:
-            next_text = self.small_font.render("BOSS DEFEATED! YOU WIN!", True, (0, 100, 0))
-        else:
-            next_text = self.small_font.render(f"Level {self.level + 1} Ready", True, BLACK)
-        
+        next_text = self.small_font.render(f"Level {self.level + 1} Ready", True, BLACK)
         continue_text = self.small_font.render("Press SPACE to Continue", True, BLACK)
         
         self.screen.blit(complete_text, (WIDTH // 2 - 150, HEIGHT // 2 - 100))
-        self.screen.blit(next_text, (WIDTH // 2 - 150, HEIGHT // 2 - 20))
+        self.screen.blit(next_text, (WIDTH // 2 - 100, HEIGHT // 2 - 20))
         self.screen.blit(continue_text, (WIDTH // 2 - 140, HEIGHT // 2 + 60))
 
     def run(self):

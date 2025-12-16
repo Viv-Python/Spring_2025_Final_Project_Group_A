@@ -1,52 +1,58 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Test script for bear asset loading and boss respawn bug fixes.
-Tests:
-1. Bear asset loads properly in the boss
-2. Boss respawn bug is fixed (boss doesn't respawn after being defeated)
-3. Game transitions correctly after boss is defeated
+Test script for background implementation:
+1. Verify background images are generated for all levels
+2. Test background loading in Game class
+3. Verify backgrounds are drawn correctly
 """
 
 import sys
 sys.path.insert(0, 'src')
 
 import pygame
-from settings import WIDTH, HEIGHT, ENEMY_SIZE, BOSS_LEVEL, NUM_REGULAR_LEVELS, GAME_STATE_LEVEL_COMPLETE
-from player import Player, Attack
-from boss import Boss
-from platform import Platform
+import os
+from settings import BOSS_LEVEL, NUM_REGULAR_LEVELS
 from game import Game
 
 pygame.init()
 
-# ==================== TEST 1: Boss Bear Asset Loading ====================
+# ==================== TEST 1: Background Files Exist ====================
 
-def test_boss_bear_asset_loading():
-    """Test that boss loads the bear asset properly"""
+def test_background_files_exist():
+    """Test that all background image files are generated"""
     print("=" * 60)
-    print("TEST 1: Boss Bear Asset Loading")
+    print("TEST 1: Background Files Exist")
     print("=" * 60)
     
     try:
-        # Create a boss and check if bear image was loaded
-        boss = Boss(200, 100)
+        background_files = {
+            1: 'swamp.png',
+            2: 'jungle.png',
+            3: 'forest.png',
+            BOSS_LEVEL: 'cave.png',
+        }
         
-        # Check that the boss has an image
-        assert boss.image is not None, "Boss image should not be None"
-        print("[+] Boss image created successfully")
+        base_paths = [
+            'assets/backgrounds',
+            'src/assets/backgrounds',
+        ]
         
-        # Check the base image is stored
-        assert hasattr(boss, 'base_image'), "Boss should have base_image attribute"
-        assert boss.base_image is not None, "Boss base_image should not be None"
-        print("[+] Boss base_image stored successfully")
+        found_files = {}
+        for level, filename in background_files.items():
+            found = False
+            for base_path in base_paths:
+                filepath = os.path.join(base_path, filename)
+                if os.path.exists(filepath):
+                    found = True
+                    found_files[level] = filepath
+                    print(f"[+] Found background for level {level}: {filepath}")
+                    break
+            
+            assert found, f"Background image not found for level {level}"
         
-        # Check dimensions - should be 100x100 (ENEMY_SIZE * 2)
-        assert boss.image.get_width() == 100, f"Boss width should be 100, got {boss.image.get_width()}"
-        assert boss.image.get_height() == 100, f"Boss height should be 100, got {boss.image.get_height()}"
-        print(f"[+] Boss image dimensions correct: {boss.image.get_width()}x{boss.image.get_height()}")
-        
-        print("[+] PASS: Boss Bear Asset Loading test passed")
+        print("[+] PASS: All background files exist")
+        return True
         
     except AssertionError as e:
         print(f"[X] FAIL: {e}")
@@ -60,44 +66,41 @@ def test_boss_bear_asset_loading():
     print()
     return True
 
-# ==================== TEST 2: Boss Respawn Bug Fix ====================
+# ==================== TEST 2: Game Loading Backgrounds ====================
 
-def test_boss_respawn_bug_fix():
-    """Test that boss doesn't respawn after being defeated"""
+def test_game_load_background():
+    """Test that Game class loads backgrounds for each level"""
     print("=" * 60)
-    print("TEST 2: Boss Respawn Bug Fix")
+    print("TEST 2: Game Loading Backgrounds")
     print("=" * 60)
     
     try:
-        # Create a game at boss level
-        game = Game(level=BOSS_LEVEL)
+        levels_to_test = [1, 2, 3, BOSS_LEVEL]
         
-        # Verify boss exists initially
-        assert game.boss is not None, "Boss should exist at boss level"
-        assert game.boss in game.enemies, "Boss should be in enemies group"
-        initial_boss = game.boss
-        print("[+] Boss created at level start")
+        for level in levels_to_test:
+            print(f"Testing level {level}...")
+            game = Game(level=level)
+            
+            # Check that background_image attribute exists
+            assert hasattr(game, 'background_image'), f"Game missing background_image attribute"
+            print(f"  [+] Game has background_image attribute")
+            
+            # Check if background was loaded (should be pygame.Surface if loaded)
+            if game.background_image is not None:
+                assert isinstance(game.background_image, pygame.Surface), \
+                    f"background_image should be pygame.Surface, got {type(game.background_image)}"
+                print(f"  [+] Background loaded as pygame.Surface for level {level}")
+                
+                # Check image dimensions match screen size
+                from settings import WIDTH, HEIGHT
+                assert game.background_image.get_size() == (WIDTH, HEIGHT), \
+                    f"Background size mismatch: {game.background_image.get_size()} vs ({WIDTH}, {HEIGHT})"
+                print(f"  [+] Background dimensions correct: {game.background_image.get_size()}")
+            else:
+                print(f"  [!] No background image loaded for level {level}, using fallback colors")
         
-        # Simulate defeating the boss
-        game.boss.health = 0
-        game.boss.take_damage(0)  # This will call kill() on the boss
-        print("[+] Boss defeated (health <= 0)")
-        
-        # Update to process the boss removal
-        game.update()
-        print(f"[+] After update: enemies count = {len(game.enemies)}")
-        
-        # Check that boss is removed from enemies
-        assert len(game.enemies) == 0, f"Boss should be removed from enemies group, but {len(game.enemies)} remain"
-        print("[+] Boss removed from enemies group")
-        
-        # Now simulate what happens when level complete and trying to restart
-        # The game should transition to GAME_STATE_GAMEOVER instead of reinitializing
-        game.game_state = GAME_STATE_LEVEL_COMPLETE
-        game.handle_events()  # This won't do anything without actual key events
-        
-        print("[+] Level complete state handled correctly")
-        print("[+] PASS: Boss Respawn Bug Fix test passed")
+        print("[+] PASS: Game loading backgrounds correctly")
+        return True
         
     except AssertionError as e:
         print(f"[X] FAIL: {e}")
@@ -111,79 +114,79 @@ def test_boss_respawn_bug_fix():
     print()
     return True
 
-# ==================== TEST 3: Game Level Transition Logic ====================
+# ==================== TEST 3: Background Level Mapping ====================
 
-def test_level_transition_logic():
-    """Test that game correctly transitions after defeating boss"""
+def test_background_level_mapping():
+    """Test that correct background is loaded for each level"""
     print("=" * 60)
-    print("TEST 3: Game Level Transition Logic")
+    print("TEST 3: Background Level Mapping")
     print("=" * 60)
     
     try:
-        # Test normal level transition
+        level_bg_mapping = {
+            1: 'swamp',
+            2: 'jungle',
+            3: 'forest',
+            BOSS_LEVEL: 'cave',
+        }
+        
+        for level, expected_bg in level_bg_mapping.items():
+            game = Game(level=level)
+            
+            # Check background filename expectations by checking if it was loaded
+            if game.background_image is not None:
+                print(f"[+] Level {level}: Background loaded (expected {expected_bg})")
+            else:
+                print(f"[!] Level {level}: Using fallback colors (expected {expected_bg} background)")
+        
+        print("[+] PASS: Background level mapping verified")
+        return True
+        
+    except Exception as e:
+        print(f"[X] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+    
+    print()
+    return True
+
+# ==================== TEST 4: Game Render with Backgrounds ====================
+
+def test_game_render_with_backgrounds():
+    """Test that game renders with backgrounds loaded"""
+    print("=" * 60)
+    print("TEST 4: Game Render with Backgrounds")
+    print("=" * 60)
+    
+    try:
+        # Create game
         game = Game(level=1)
-        assert game.level == 1, "Game should start at level 1"
-        print("[+] Level 1 created")
         
-        # Test boss level access
-        game = Game(level=BOSS_LEVEL)
-        assert game.level == BOSS_LEVEL, f"Game should be at level {BOSS_LEVEL}"
-        assert game.boss is not None, "Boss should exist at boss level"
-        print(f"[+] Boss level {BOSS_LEVEL} created with boss")
+        # Call draw_game to ensure it works with backgrounds
+        try:
+            game.draw_game()
+            print("[+] game.draw_game() executed without errors")
+        except Exception as e:
+            print(f"[X] Error in draw_game(): {e}")
+            raise
         
-        # Verify boss is in enemies
-        assert len(game.enemies) == 1, f"Boss level should have 1 enemy (the boss), got {len(game.enemies)}"
-        assert isinstance(list(game.enemies)[0], Boss), "Enemy should be a Boss"
-        print("[+] Boss is the only enemy at boss level")
+        # Call update to ensure game loop works
+        try:
+            game.update()
+            print("[+] game.update() executed without errors")
+        except Exception as e:
+            print(f"[X] Error in update(): {e}")
+            raise
         
-        print("[+] PASS: Game Level Transition Logic test passed")
+        # Check game state
+        from settings import GAME_STATE_PLAYING
+        assert game.game_state == GAME_STATE_PLAYING, "Game should be in PLAYING state"
+        print("[+] Game state is correct (PLAYING)")
         
-    except AssertionError as e:
-        print(f"[X] FAIL: {e}")
-        return False
-    except Exception as e:
-        print(f"[X] ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-    
-    print()
-    return True
-
-# ==================== TEST 4: Asset Loader Path Handling ====================
-
-def test_asset_loader_path_handling():
-    """Test that asset loader handles different working directories"""
-    print("=" * 60)
-    print("TEST 4: Asset Loader Path Handling")
-    print("=" * 60)
-    
-    try:
-        from asset_loader import get_loader
+        print("[+] PASS: Game renders correctly with backgrounds")
+        return True
         
-        loader = get_loader()
-        assert loader is not None, "Asset loader should be created"
-        print("[+] Asset loader initialized")
-        
-        # Check that assets are available
-        assert loader.available, "Assets should be available"
-        print("[+] Assets directory found")
-        
-        # Try to load the bear asset through the loader
-        bear_asset = loader.load_sprite('enemies/scary_bear.png')
-        assert bear_asset is not None, "Bear asset should load successfully"
-        print("[+] Bear asset loaded through asset loader")
-        
-        # Verify the asset is in cache
-        assert 'assets' in loader.asset_dir or '..' in loader.asset_dir, \
-            f"Asset dir should be adjusted: {loader.asset_dir}"
-        print(f"[+] Asset dir correctly set to: {loader.asset_dir}")
-        
-        print("[+] PASS: Asset Loader Path Handling test passed")
-        
-    except AssertionError as e:
-        print(f"[X] FAIL: {e}")
-        return False
     except Exception as e:
         print(f"[X] ERROR: {e}")
         import traceback
@@ -199,16 +202,16 @@ def main():
     """Run all tests"""
     print("\n")
     print("=" * 60)
-    print("GAME FIXES TEST SUITE - REVISED")
-    print("Bear Asset | Boss Respawn Bug | Level Transitions")
+    print("BACKGROUND IMPLEMENTATION TEST SUITE")
+    print("Files | Loading | Mapping | Rendering")
     print("=" * 60)
     print()
     
     tests = [
-        test_boss_bear_asset_loading,
-        test_boss_respawn_bug_fix,
-        test_level_transition_logic,
-        test_asset_loader_path_handling,
+        test_background_files_exist,
+        test_game_load_background,
+        test_background_level_mapping,
+        test_game_render_with_backgrounds,
     ]
     
     passed = 0

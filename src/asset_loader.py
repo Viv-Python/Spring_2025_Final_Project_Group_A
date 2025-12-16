@@ -18,14 +18,8 @@ class AssetLoader:
     
     def _check_assets(self) -> bool:
         """Check if assets directory and key files exist"""
-        # Adjust asset_dir path if running from src/ subdirectory
         if not os.path.exists(self.asset_dir):
-            # Try parent directory
-            alternate_path = os.path.join('..', self.asset_dir)
-            if os.path.exists(alternate_path):
-                self.asset_dir = alternate_path
-            else:
-                return False
+            return False
         
         key_assets = [
             'player/player_idle.png',

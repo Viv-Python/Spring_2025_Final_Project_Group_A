@@ -34,10 +34,10 @@ class Attack(pygame.sprite.Sprite):
             ])
             self.animation_frames = None
             print("⚠ Sword animation not found, using fallback")
-            
-            # Only flip the fallback sword if swinging left
-            if direction == -1:
-                self.image = pygame.transform.flip(self.image, True, False)
+        
+        # Rotate sword hilt based on direction
+        if direction == -1:
+            self.image = pygame.transform.flip(self.image, True, False)
         
         self.image.set_alpha(180)  # Semi-transparent
         self.rect = self.image.get_rect(topleft=(x, y))
@@ -56,6 +56,9 @@ class Attack(pygame.sprite.Sprite):
                 self.animation_counter = 0
                 self.animation_frame = (self.animation_frame + 1) % len(self.animation_frames)
                 self.image = self.animation_frames[self.animation_frame]
+                # Rotate sword hilt if swinging left
+                if self.direction == -1:
+                    self.image = pygame.transform.flip(self.image, True, False)
                 self.image.set_alpha(180)
         
         if self.lifetime <= 0:
